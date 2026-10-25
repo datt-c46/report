@@ -1,0 +1,37 @@
+\documentclass[12pt,a4paper,oneside]{report}
+\input{config/info}
+\input{config/preamble}
+
+\begin{document}
+
+% ---- Không đánh số trang: bìa, bìa phụ, trang nhiệm vụ ----
+% Trang bìa ngoài, trang lót trắng và bìa phụ.
+\pagestyle{empty}
+\input{frontmatter/cover}
+% Trang lót trắng theo quy cách trình bày.
+\null\thispagestyle{empty}\clearpage
+\input{frontmatter/titlepage}
+\pagestyle{datn}
+\input{frontmatter/assignment}
+
+% ---- Số La Mã: i, ii, iii ... ----
+\pagenumbering{roman}
+\input{frontmatter/acknowledgement}
+\input{frontmatter/declaration}
+\input{frontmatter/toc}
+\input{frontmatter/abbreviations}
+\input{frontmatter/lists}
+
+% ---- Số Ả Rập: 1, 2, 3 ... ----
+\pagenumbering{arabic}
+\input{chapters/intro}
+\input{chapters/assignment_table}
+\input{chapters/ch1_introduction}
+\input{chapters/ch2_theory}
+\input{chapters/ch3_design}
+\input{chapters/ch4_implementation}
+\input{backmatter/conclusion}
+\input{backmatter/references}
+% \input{backmatter/appendix}   % PHỤ LỤC (nếu có)
+
+\end{document}

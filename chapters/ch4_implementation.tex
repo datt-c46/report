@@ -1,0 +1,47 @@
+\chapter{KẾ HOẠCH TRIỂN KHAI VÀ KIỂM THỬ}
+\label{ch:impl}
+
+\section{Nguyên tắc triển khai}
+Đợt đầu ưu tiên dựng các hợp đồng giữa mô-đun và kiểm tra nghiệp vụ trước khi tối ưu mô hình. Các cổng biên cần được thiết kế độc lập: âm thanh thành văn bản; văn bản thành ý định/thực thể; biểu thức thời gian thành khoảng thời gian; thao tác nghiệp vụ thành yêu cầu Calendar API; và kết quả API thành thông báo người dùng. Mỗi cổng có kiểm thử đơn vị để lỗi của mô hình tiếng nói không che khuất lỗi nghiệp vụ.
+
+Nền tảng desktop đề xuất là Electron với TypeScript để dùng chung ngôn ngữ cho giao diện và phần điều phối, phù hợp với thư viện tích hợp web. Đây là lựa chọn thiết kế ban đầu, cần được xác nhận bằng nguyên mẫu. Nếu sử dụng Electron, cần bật sandbox/context isolation, tắt quyền Node.js trong renderer, chỉ công bố các hàm IPC tối thiểu và xác thực dữ liệu ở tiến trình chính theo khuyến nghị bảo mật của Electron \cite{electronsecurity}. Chưa chốt engine VAD, wake word, STT hay TTS: chúng sẽ được so sánh theo hỗ trợ tiếng Việt, quyền riêng tư, giấy phép, tài nguyên, độ trễ và chất lượng.
+
+\section{Các giai đoạn công việc}
+\begin{enumerate}
+  \item \textbf{Khảo sát và thiết kế:} thống nhất phạm vi, luồng nghiệp vụ, yêu cầu và chính sách xác nhận; hoàn thành trong báo cáo định kỳ lần 1.
+  \item \textbf{Nguyên mẫu âm thanh:} kiểm tra quyền microphone, trạng thái nghe, VAD, wake word và thu một câu lệnh; ghi nhận khả năng chạy trên máy mục tiêu.
+  \item \textbf{Nguyên mẫu hiểu lệnh:} tạo tập câu tiếng Việt có đáp án chuẩn, thực hiện STT, phân loại ý định, trích xuất thực thể và làm rõ trường thiếu.
+  \item \textbf{Tích hợp Calendar:} dựng OAuth với PKCE, lưu token an toàn, đọc lịch trước; sau đó mới thử tạo/cập nhật/xóa trên lịch thử nghiệm riêng.
+  \item \textbf{Tích hợp hội thoại và phản hồi:} bổ sung xác nhận, hủy, xử lý lỗi, giao diện trạng thái và TTS tùy chọn.
+  \item \textbf{Đánh giá và hoàn thiện:} chạy bộ ca kiểm thử, đo chất lượng và độ trễ, xử lý các lỗi ưu tiên cao, ghi rõ giới hạn còn lại.
+\end{enumerate}
+
+\section{Kế hoạch kiểm thử}
+\begin{table}[H]
+\caption{Ma trận kiểm thử ban đầu}\label{tab:test-plan}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{|>{\raggedright\arraybackslash}p{2.6cm}|>{\raggedright\arraybackslash}p{5.2cm}|>{\raggedright\arraybackslash}p{6.3cm}|}\hline
+\textbf{Nhóm} & \textbf{Tình huống} & \textbf{Kết quả mong đợi}\\\hline
+Nhận dạng & Câu lệnh tiếng Việt rõ, có nhiễu nền và có khoảng dừng giữa câu. & Ghi nhận bản chép; báo không chắc chắn thay vì tự thực thi khi nhận dạng thiếu tin cậy.\\\hline
+Ý định/thực thể & Xem, tạo, tìm, sửa, xóa; thiếu ngày, thiếu giờ, nhiều sự kiện cùng tên. & Đúng ý định; trường thiếu được hỏi; sự kiện mục tiêu được phân biệt rõ.\\\hline
+Thời gian & Ngày tuyệt đối, “ngày mai”, thứ trong tuần, qua nửa đêm và múi giờ. & Thời điểm chuẩn hóa nhất quán; trường hợp mơ hồ được làm rõ.\\\hline
+Nghiệp vụ lịch & Tạo, đọc, cập nhật, xóa; hủy trước xác nhận; xác nhận xóa. & Chỉ thay đổi dữ liệu theo đúng thao tác đã xác nhận; phản hồi dựa trên kết quả API.\\\hline
+OAuth/API & Từ chối cấp quyền, token hết hạn, mất mạng, không đủ quyền, timeout và giới hạn tốc độ. & Không lộ token; không báo thành công giả; hướng dẫn kết nối lại hoặc thử lại an toàn.\\\hline
+Ứng dụng desktop & Tắt microphone, chạy nền, thoát ứng dụng, mất kết nối khi đang chờ. & Trạng thái hiển thị đúng; tác vụ được hủy hoặc khôi phục có kiểm soát.\\\hline
+\end{tabular}
+\nguon{Nhóm đề xuất; từng ca sẽ được mở rộng trong giai đoạn hiện thực.}
+\end{table}
+
+\section{Chỉ số đánh giá}
+\begin{itemize}
+  \item \textbf{STT:} WER trên tập câu có bản chép tham chiếu; phân tách kết quả theo môi trường âm thanh và nhóm câu lệnh.
+  \item \textbf{Hiểu lệnh:} độ chính xác ý định; độ chính xác từng trường quan trọng như ngày, giờ và tiêu đề; tỷ lệ hỏi lại đúng khi dữ liệu thiếu.
+  \item \textbf{Wake word/VAD:} tỷ lệ bỏ sót, tỷ lệ kích hoạt nhầm trên thời lượng chạy nền, thời gian xác định kết thúc câu và mức sử dụng CPU.
+  \item \textbf{Calendar:} tỷ lệ thao tác hoàn tất đúng trên lịch thử nghiệm, tỷ lệ thao tác bị trùng và khả năng phục hồi khi API trả lỗi.
+  \item \textbf{Độ trễ:} thời gian theo từng mô-đun và đầu-cuối; báo cáo p50/p95, số mẫu, cấu hình máy, mạng và trạng thái tải mô hình.
+  \item \textbf{Quyền riêng tư/an toàn:} xác minh không ghi token vào log, không gửi yêu cầu khi chưa xác nhận theo chính sách và microphone dừng khi người dùng tắt.
+\end{itemize}
+Các chỉ số sẽ được đo bằng tập dữ liệu và môi trường được mô tả rõ. Báo cáo lần 1 mới xác định cách đo; chưa có số liệu để kết luận mô hình hoặc phương án nào tốt hơn.
+
+\section{Phạm vi kết quả của báo cáo định kỳ lần 1}
+Sản phẩm của giai đoạn hiện tại là phạm vi bài toán, tổng hợp cơ sở lý thuyết, yêu cầu chức năng/phi chức năng, quy trình nghiệp vụ và kiến trúc nguyên mẫu. Các thành phần trong kế hoạch ở trên chưa được xem là đã triển khai hoặc kiểm thử nếu chưa có bằng chứng từ mã nguồn và kết quả chạy. Giai đoạn tiếp theo tập trung tạo nguyên mẫu nhỏ, kiểm chứng giả định về tiếng Việt và quyền truy cập Calendar, sau đó mới chốt công nghệ.

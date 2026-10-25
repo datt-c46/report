@@ -1,0 +1,131 @@
+% CẤU HÌNH CHUNG - theo Phụ lục 3, QĐ 449/QĐ-HV (PTIT). Biên dịch bằng XeLaTeX
+\usepackage{fix-cm}
+\usepackage{fontspec}
+\IfFontExistsTF{Times New Roman}
+  {\setmainfont{Times New Roman}}
+  {\setmainfont{TeX Gyre Termes}}   % thay thế khi máy không có Times New Roman
+% Không dùng babel-vietnamese (nhiều bản TeX không có file .ldf): đặt tên nhãn thủ công,
+% tắt ngắt từ vì tiếng Việt không cần gạch nối cuối dòng.
+\hyphenpenalty=10000 \exhyphenpenalty=10000 \tolerance=2000
+\renewcommand{\figurename}{Hình}\renewcommand{\tablename}{Bảng}
+\usepackage{amsmath}
+\usepackage{exscale}
+\DeclareFontShape{OMX}{cmex}{m}{n}{%
+  <-8>sfixed * cmex7
+  <8> cmex8
+  <9> cmex9
+  <10> <10.95> <12> <13> <14.4> <17.28> <20.74> <24.88>cmex10
+}{}
+\usepackage{graphicx,xcolor,array,booktabs,longtable,multirow,enumitem}
+\usepackage{float,tikz}
+\usetikzlibrary{positioning,arrows.meta,calc,shapes.geometric}
+
+% --- Khổ giấy: A4; top/bottom/right 2 cm, left 3 cm; header/footer ~1 cm
+\usepackage[a4paper,top=2cm,bottom=2cm,left=3cm,right=2cm,
+            headheight=17pt,headsep=1cm,footskip=1cm]{geometry}
+
+% --- Cỡ chữ 13 pt, giãn dòng 1.2, before/after = 3 pt
+\makeatletter
+\renewcommand\normalsize{\@setfontsize\normalsize{13}{15.6}%
+  \abovedisplayskip 8\p@ \@plus2\p@ \@minus4\p@
+  \abovedisplayshortskip \z@ \@plus3\p@
+  \belowdisplayshortskip 6\p@ \@plus3\p@ \@minus3\p@
+  \belowdisplayskip \abovedisplayskip
+  \let\@listi\@listI}
+\renewcommand\small{\@setfontsize\small{12}{14.4}}
+\renewcommand\footnotesize{\@setfontsize\footnotesize{11}{13.2}}
+\makeatother
+\normalsize
+\linespread{1}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}          % 3 pt trước + 3 pt sau
+\sloppy
+\setlist{nosep,itemsep=3pt,topsep=3pt}
+
+% --- Đánh số: 1.1, 1.1.1, 1.1.1.a ; công thức theo chương
+\renewcommand{\thesubsubsection}{\thesubsection.\alph{subsubsection}}
+\setcounter{secnumdepth}{3}
+\setcounter{tocdepth}{3}
+\numberwithin{equation}{chapter}
+
+% --- Tiêu đề chương / mục
+\usepackage{titlesec}
+\titleformat{\chapter}[block]{\normalfont\bfseries\fontsize{15}{18}\selectfont\centering}
+  {CHƯƠNG \thechapter:}{0.4em}{}
+\titleformat{name=\chapter,numberless}[block]{\normalfont\bfseries\fontsize{15}{18}\selectfont\centering}{}{0pt}{}
+\titlespacing*{\chapter}{0pt}{0pt}{18pt}
+\titleformat{\section}{\normalfont\bfseries\normalsize}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\normalfont\bfseries\normalsize}{\thesubsection}{0.6em}{}
+\titleformat{\subsubsection}{\normalfont\bfseries\itshape\normalsize}{\thesubsubsection}{0.6em}{}
+\titlespacing*{\section}{0pt}{12pt}{4pt}
+\titlespacing*{\subsection}{0pt}{9pt}{3pt}
+\titlespacing*{\subsubsection}{0pt}{6pt}{3pt}
+
+% --- Header / Footer
+\usepackage{fancyhdr}
+\newcommand{\DATNstyle}{%
+  \fancyhf{}
+  \fancyhead[L]{\small Đồ án tốt nghiệp Đại học}
+  \fancyhead[R]{\small\rightmark}
+  \fancyfoot[L]{\small\FooterSV}
+  \fancyfoot[R]{\small\thepage}
+  \renewcommand{\headrulewidth}{0.4pt}
+  \renewcommand{\footrulewidth}{0.4pt}}
+\fancypagestyle{datn}{\DATNstyle}
+\fancypagestyle{plain}{\DATNstyle}          % trang đầu chương cũng có header/footer
+\fancypagestyle{nonum}{\DATNstyle\fancyfoot[R]{}}   % trang nhiệm vụ: không số trang
+
+% Chương không đánh số (LỜI CẢM ƠN, MỞ ĐẦU, ...): ghi tiêu đề IN HOA
+\newcommand{\unnumchapter}[1]{%
+  \chapter*{#1}\addcontentsline{toc}{chapter}{#1}\markboth{}{#1}}
+\renewcommand{\chaptermark}[1]{\markboth{}{CHƯƠNG \thechapter: #1}}
+
+% --- Hình, bảng, sơ đồ: chú thích dưới hình/sơ đồ, trên bảng
+\usepackage{caption}
+\captionsetup{font=small,labelfont=bf,labelsep=colon,skip=6pt}
+\captionsetup[table]{position=top}
+\newfloat{diagram}{htbp}{lod}[chapter]
+\floatname{diagram}{Sơ đồ}
+\captionsetup[diagram]{position=bottom}
+% Ghi chú nguồn dưới mỗi hình/bảng/sơ đồ (theo Mẫu 7)
+\newcommand{\nguon}[1]{\par\vspace{2pt}{\centering\small\itshape Nguồn: #1\par}}
+
+% --- Mục lục & Danh mục bảng, sơ đồ, hình vẽ
+\usepackage{tocloft}
+\renewcommand{\cftchapfont}{\small\bfseries}
+\renewcommand{\cftchappagefont}{\small\bfseries}
+\renewcommand{\cftchappresnum}{CHƯƠNG~}
+\renewcommand{\cftchapaftersnum}{:}
+\setlength{\cftchapnumwidth}{5.6em}
+\renewcommand{\cftchapleader}{\cftdotfill{\cftdotsep}}
+\renewcommand{\cftdotsep}{1.5}
+\setlength{\cftbeforechapskip}{4pt}
+\renewcommand{\cftsecfont}{\small\bfseries}
+\renewcommand{\cftsecpagefont}{\small}
+\renewcommand{\cftsubsecfont}{\small}
+\renewcommand{\cftsubsubsecfont}{\small}
+\cftsetindents{section}{1.5em}{2.5em}
+\cftsetindents{subsection}{4em}{3.2em}
+\cftsetindents{subsubsection}{7.2em}{3.8em}
+\setlength{\cftbeforesecskip}{2pt}
+\setlength{\cftbeforesubsecskip}{1pt}
+\renewcommand{\cfttabpresnum}{BẢNG~}
+\renewcommand{\cftfigpresnum}{HÌNH~}
+\newcounter{loddepth}\setcounter{loddepth}{1}
+\newlistentry{sodo}{lod}{0}          % kiểu dòng mục lục cho "Sơ đồ"
+\makeatletter\let\l@diagram\l@sodo\makeatother
+\renewcommand{\cftsodopresnum}{SƠ ĐỒ~}
+\setlength{\cftsodoindent}{1.5em}
+\setlength{\cfttabnumwidth}{5.6em}
+\setlength{\cftfignumwidth}{5.6em}
+\setlength{\cftsodonumwidth}{5.6em}
+\renewcommand{\cfttabfont}{\small}
+\renewcommand{\cftfigfont}{\small}
+\renewcommand{\cftsodofont}{\small}
+\setlength{\cftbeforetabskip}{2pt}
+\setlength{\cftbeforefigskip}{2pt}
+\setlength{\cftbeforesodoskip}{2pt}
+\setlength{\cftparskip}{0pt}
+
+% --- Siêu liên kết (không tô màu để in)
+\usepackage[hidelinks,unicode,hypertexnames=false,pdftitle={\TenDeTai}]{hyperref}

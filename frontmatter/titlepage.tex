@@ -1,0 +1,11 @@
+% ===== Mẫu 2: Bìa phụ =====
+\thispagestyle{empty}\null
+\begin{tikzpicture}[remember picture,overlay]
+  \draw[line width=0.5pt] ([xshift=2.3cm,yshift=-2.6cm]current page.north west)
+        rectangle ([xshift=-1.3cm,yshift=2cm]current page.south east);
+  \node[anchor=north,inner sep=0pt] at
+    ([xshift=10.9cm,yshift=-3.4cm]current page.north west) {\CoverBody{14.5cm}};
+  \node[anchor=center] at ([xshift=10.9cm,yshift=3.2cm]current page.south west)
+    {\bfseries TP. HỒ CHÍ MINH, NĂM \NamBaoCao};
+\end{tikzpicture}
+\clearpage
