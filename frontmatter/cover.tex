@@ -1,0 +1,48 @@
+% ===== Mẫu 1: Bìa ngoài + gáy =====
+\newcommand{\LogoPTIT}{%
+  \IfFileExists{figures/logo-ptit.png}
+    {\includegraphics[height=3.2cm]{figures/logo-ptit.png}}
+    {\fbox{\parbox[c][2.8cm][c]{2.8cm}{\centering\small LOGO\\PTIT}}}}
+
+% Nội dung bìa dùng chung cho bìa ngoài và bìa phụ (#1: bề rộng)
+\newcommand{\CoverBody}[1]{%
+  \begin{minipage}{#1}\centering
+    {\bfseries\fontsize{14}{17}\selectfont
+     BỘ KHOA HỌC VÀ CÔNG NGHỆ\\
+     HỌC VIỆN CÔNG NGHỆ BƯU CHÍNH VIỄN THÔNG\\
+     ------------------------------\par}
+    \par\vspace{1cm}\LogoPTIT\par\vspace{1.2cm}
+    {\bfseries\fontsize{36}{42}\selectfont ĐỒ ÁN\\TỐT NGHIỆP ĐẠI HỌC\par}
+    \vspace{1.3cm}
+    {\bfseries\itshape\fontsize{16}{20}\selectfont % 16-30 pt tùy độ dài tên đề tài
+     Đề tài: “\MakeUppercase{\TenDeTai}”\par}
+    \vspace{2.2cm}
+    \begin{flushleft}\normalsize
+    \begin{tabular}{@{}l@{\hspace{1.5em}}l@{}}
+      \textbf{Giáo viên hướng dẫn} & \textbf{: \MakeUppercase{\GVHD}} \\
+      \textbf{Nhóm sinh viên thực hiện} & \textbf{: \NhomSV} \\[4pt]
+    \end{tabular}\\
+    \begin{tabular}{@{}p{5.6cm}l@{}}
+      Mã SV: \MaSVMot & Họ và tên: \TenSVMot \\
+      Mã SV: \MaSVHai & Họ và tên: \TenSVHai \\
+    \end{tabular}
+    \end{flushleft}
+  \end{minipage}}
+
+\thispagestyle{empty}\null
+\begin{tikzpicture}[remember picture,overlay]
+  \draw[line width=0.5pt] ([xshift=3.4cm,yshift=-3cm]current page.north west)
+        rectangle ([xshift=-1cm,yshift=1.3cm]current page.south east);
+  \draw[line width=0.5pt] ([xshift=1.5cm,yshift=-3cm]current page.north west)
+        rectangle ([xshift=2.8cm,yshift=1.3cm]current page.south west);
+  \node[rotate=-90,anchor=west,inner sep=0pt] at
+    ([xshift=2.15cm,yshift=-3.6cm]current page.north west)
+    {\parbox{19.5cm}{\small\GayBia\hfill CHUYÊN NGÀNH: CÔNG NGHỆ PHẦN MỀM\hfill \KhoaHoc}};
+  \node[anchor=center,align=center] at
+    ([xshift=2.15cm,yshift=4cm]current page.south west) {\small TP.\\HCM\\2026};
+  \node[anchor=north,inner sep=0pt] at
+    ([xshift=11.7cm,yshift=-3.9cm]current page.north west) {\CoverBody{14.5cm}};
+  \node[anchor=center] at ([xshift=11.7cm,yshift=2.3cm]current page.south west)
+    {\bfseries TP. HỒ CHÍ MINH, NĂM \NamBaoCao};
+\end{tikzpicture}
+\clearpage

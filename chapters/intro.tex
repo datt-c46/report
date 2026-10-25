@@ -1,0 +1,17 @@
+\unnumchapter{MỞ ĐẦU}
+
+\textbf{Lý do chọn đề tài.}
+Lịch làm việc là dữ liệu có cấu trúc nhưng người dùng thường diễn đạt yêu cầu bằng ngôn ngữ tự nhiên, chẳng hạn “nhắc tôi họp nhóm lúc ba giờ chiều thứ sáu”. Để biến câu nói thành một sự kiện lịch chính xác, ứng dụng phải nhận được tiếng nói, hiểu được ý định, chuẩn hóa thời gian theo múi giờ và chỉ ghi dữ liệu sau khi các thông tin cần thiết đã rõ. Đây là bài toán liên ngành, kết hợp xử lý tiếng nói, quản lý hội thoại, tích hợp dịch vụ web và thiết kế ứng dụng desktop. Đề tài tập trung khảo sát và xây dựng một trợ lý chạy thường trú trên máy tính, kết nối Google Calendar, đồng thời chú trọng quyền riêng tư, khả năng xử lý lỗi và tính dễ kiểm chứng của từng thao tác.
+
+\textbf{Mục đích nghiên cứu.}
+Mục tiêu của đề tài là đề xuất và xây dựng nguyên mẫu trợ lý giọng nói hỗ trợ người dùng tra cứu và quản lý sự kiện Google Calendar bằng tiếng Việt. Báo cáo định kỳ lần 1 tập trung xác định bài toán, khảo sát nền tảng kỹ thuật, mô tả quy trình nghiệp vụ và xây dựng thiết kế ban đầu; chưa trình bày kết quả đo hiệu năng hay khẳng định sản phẩm đã triển khai hoàn chỉnh.
+
+\textbf{Tình hình nghiên cứu.}
+Các trợ lý số hiện nay kết hợp nhận dạng tiếng nói, hiểu ngôn ngữ tự nhiên và dịch vụ lịch; các hệ sinh thái thương mại thường tích hợp sẵn phần cứng, tài khoản và dịch vụ của nhà cung cấp. Ở hướng xây dựng ứng dụng riêng, các thành phần như Whisper cho nhận dạng tiếng nói, các bộ phát hiện từ khóa đánh thức, Electron cho ứng dụng desktop và Google Calendar API có thể được ghép thành một quy trình chuyên biệt. Thách thức của đề tài không chỉ là nối các thành phần mà còn nằm ở việc xử lý cách nói tiếng Việt đa dạng, thời gian tương đối, lệnh thiếu thông tin, phản hồi lỗi API và tránh tạo hoặc sửa nhầm sự kiện. Vì vậy, nhóm chọn cách thiết kế theo mô-đun và đánh giá từng khâu trước khi tích hợp toàn bộ \cite{radford2022whisper,gcalapi,electron}.
+
+\textbf{Phạm vi và phương pháp nghiên cứu.}
+Phạm vi nguyên mẫu là ứng dụng desktop, ưu tiên môi trường Windows và lệnh tiếng Việt, tích hợp một tài khoản Google Calendar do người dùng ủy quyền. Các thao tác dự kiến gồm xem lịch, tạo sự kiện, tìm sự kiện và cập nhật hoặc xóa sau khi xác định đúng sự kiện. Những chức năng như nhiều nhà cung cấp lịch, ứng dụng di động, tự gửi thư mời, xử lý mọi biến thể tiếng nói hoặc quản lý chuỗi sự kiện lặp lại không thuộc phạm vi tối thiểu ban đầu. Nhóm nghiên cứu tài liệu chuẩn và tài liệu nhà cung cấp, phân tích tình huống sử dụng, xây dựng nguyên mẫu theo từng mô-đun, sau đó kiểm thử bằng các câu lệnh mẫu có đáp án mong đợi. Các lựa chọn công nghệ và giới hạn nêu trong báo cáo là thiết kế ban đầu, cần được kiểm chứng bằng nguyên mẫu.
+
+\textbf{Kết cấu của đề tài.}
+Ngoài phần Mở đầu, báo cáo gồm bốn chương: Chương 1 giới thiệu đề tài và phạm vi; Chương 2 trình bày nền tảng lý thuyết; Chương 3 phân tích yêu cầu, nghiệp vụ và thiết kế ban đầu; Chương 4 nêu kế hoạch triển khai và phương pháp kiểm thử; cuối cùng là phần Kết luận, kiến nghị.
+\clearpage

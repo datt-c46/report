@@ -1,0 +1,37 @@
+\chapter{GIỚI THIỆU ĐỀ TÀI}
+\label{ch:intro}
+
+\section{Sự cần thiết của đề tài}
+Thao tác với lịch bằng giao diện truyền thống yêu cầu người dùng mở ứng dụng, chuyển đến đúng ngày, nhập tiêu đề và kiểm tra lại thời lượng. Một lệnh giọng nói có thể rút ngắn chuỗi thao tác, nhưng chỉ hữu ích khi hệ thống hiểu đúng ý định và các thông tin như ngày, giờ, tiêu đề, thời lượng hoặc người tham dự. Những cụm như “chiều thứ sáu”, “cuối tuần tới” hay “dời lịch đó sang ngày mai” còn phụ thuộc thời điểm hiện tại, múi giờ và ngữ cảnh hội thoại.
+
+Đề tài được chọn nhằm nghiên cứu một quy trình hoàn chỉnh từ tiếng nói đến hành động có kiểm soát trên Google Calendar. Thay vì xem nhận dạng tiếng nói là toàn bộ bài toán, hệ thống cần tách riêng nhận dạng, trích xuất thông tin, xác nhận dữ liệu, gọi API và phản hồi kết quả. Cách tiếp cận này giúp truy vết lỗi, bảo vệ dữ liệu người dùng và có thể thay đổi từng mô-đun khi so sánh các công nghệ khác nhau.
+
+\section{Mục tiêu của đề tài}
+Mục tiêu tổng quát là thiết kế và xây dựng nguyên mẫu trợ lý Voice Agent chạy thường trú trên máy tính, hỗ trợ người dùng tương tác với Google Calendar bằng lệnh tiếng Việt.
+\begin{enumerate}
+  \item Phân tích các tình huống sử dụng và xác định yêu cầu chức năng, phi chức năng của trợ lý.
+  \item Khảo sát phát hiện hoạt động giọng nói, từ khóa đánh thức, nhận dạng tiếng nói, hiểu ý định và tổng hợp tiếng nói.
+  \item Thiết kế quy trình biến câu lệnh thành thao tác lịch an toàn; xử lý thời gian tương đối, dữ liệu thiếu và câu lệnh mơ hồ.
+  \item Thiết kế kết nối Google Calendar bằng OAuth 2.0, chỉ yêu cầu quyền cần thiết và quản lý vòng đời thông tin xác thực.
+  \item Xây dựng nguyên mẫu theo mô-đun và đánh giá riêng độ chính xác, độ trễ, khả năng phục hồi lỗi và trải nghiệm xác nhận thao tác.
+\end{enumerate}
+
+\section{Phạm vi đề tài}
+\begin{table}[H]
+\caption{Phạm vi chức năng dự kiến của nguyên mẫu}\label{tab:scope}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|>{\raggedright\arraybackslash}p{3.3cm}|>{\raggedright\arraybackslash}p{7.0cm}|>{\raggedright\arraybackslash}p{4.3cm}|}\hline
+\textbf{Nhóm chức năng} & \textbf{Nội dung dự kiến} & \textbf{Giới hạn ban đầu}\\\hline
+Thu và nhận dạng tiếng nói & Thu âm từ microphone, phát hiện tiếng nói và từ khóa, chuyển tiếng nói tiếng Việt thành văn bản. & Một người dùng; môi trường desktop; mô-đun nhận dạng được chọn sau thử nghiệm.\\\hline
+Hiểu lệnh & Phân loại ý định và trích xuất thời gian, tiêu đề, thời lượng, lịch đích nếu có. & Tập câu lệnh liên quan đến lịch; hỏi lại khi thiếu hoặc mơ hồ.\\\hline
+Tích hợp lịch & Kết nối Google Calendar và xem, tạo, tìm, cập nhật hoặc xóa sự kiện. & Một tài khoản được ủy quyền; không tự gửi thư mời trong phạm vi tối thiểu.\\\hline
+Phản hồi & Hiển thị trạng thái, nội dung đã nhận dạng, yêu cầu xác nhận và kết quả thao tác; có thể đọc phản hồi bằng TTS. & TTS là mô-đun thay thế được; không cam kết hỗ trợ mọi giọng đọc.\\\hline
+Hội thoại & Giữ ngữ cảnh ngắn hạn để tiếp tục làm rõ một thao tác đang chờ. & Chỉ lưu trạng thái tác vụ hiện tại; chưa xây dựng hồ sơ hay bộ nhớ dài hạn.\\\hline
+\end{tabular}
+\nguon{Nhóm đề xuất trong phạm vi báo cáo định kỳ lần 1.}
+\end{table}
+
+\section{Đối tượng và phương pháp nghiên cứu}
+Đối tượng nghiên cứu gồm người dùng desktop, quy trình xử lý câu lệnh giọng nói, dịch vụ Google Calendar và các thành phần phần mềm tham gia vào quy trình. Tác nhân ngoài là người dùng, microphone và Google Calendar API; ứng dụng desktop là hệ thống đang được thiết kế.
+
+Nhóm thực hiện theo các bước: (1) nghiên cứu tài liệu kỹ thuật và chính sách API; (2) lập danh sách câu lệnh đại diện, tình huống thiếu dữ liệu và tình huống lỗi; (3) xây dựng yêu cầu và thiết kế mô-đun; (4) hiện thực nguyên mẫu theo thứ tự ưu tiên; (5) kiểm thử từng mô-đun và luồng tích hợp. Bộ câu lệnh đánh giá sẽ bao gồm các nhóm xem lịch, tạo sự kiện, tìm sự kiện, đổi thời gian, hủy sự kiện, làm rõ dữ liệu và xử lý khi dịch vụ không khả dụng. Báo cáo định kỳ lần 1 xác định phương pháp và chưa công bố số liệu thử nghiệm.

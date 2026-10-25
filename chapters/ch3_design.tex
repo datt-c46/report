@@ -1,0 +1,117 @@
+\chapter{PHÂN TÍCH VÀ THIẾT KẾ HỆ THỐNG}
+\label{ch:design}
+
+\section{Các tác nhân và ranh giới hệ thống}
+Tác nhân chính là người dùng desktop. Ứng dụng nhận âm thanh từ microphone, trình duyệt hệ thống thực hiện đăng nhập OAuth, còn Google Calendar API cung cấp dữ liệu lịch ở phía ngoài. Các mô hình nhận dạng và tổng hợp tiếng nói có thể chạy cục bộ hoặc được cung cấp qua dịch vụ; việc lựa chọn mỗi mô-đun không làm thay đổi quy tắc nghiệp vụ quản lý sự kiện.
+
+Hệ thống chịu trách nhiệm diễn giải lệnh, phát hiện dữ liệu thiếu, yêu cầu xác nhận khi cần, gọi đúng thao tác API và thông báo kết quả. Hệ thống không chịu trách nhiệm quyết định thay người dùng khi câu lệnh mơ hồ, không lưu mật khẩu Google, không âm thầm bỏ qua lỗi quyền truy cập và không khẳng định sự kiện đã thay đổi nếu API chưa xác nhận thành công.
+
+\section{Yêu cầu hệ thống}
+\subsection{Yêu cầu chức năng}
+\begin{longtable}{|>{\raggedright\arraybackslash}p{1.5cm}|>{\raggedright\arraybackslash}p{12.8cm}|}
+\caption{Yêu cầu chức năng ban đầu}\label{tab:functional-requirements}\\\hline
+\textbf{Mã} & \textbf{Mô tả yêu cầu}\\\hline
+\endfirsthead
+\hline\textbf{Mã} & \textbf{Mô tả yêu cầu}\\\hline
+\endhead
+FR-01 & Người dùng có thể bật/tắt chế độ nghe và biết rõ trạng thái microphone; ứng dụng không thu âm khi chế độ nghe đã tắt.\\\hline
+FR-02 & Ứng dụng nhận lệnh tiếng Việt, hiển thị bản chép và cho phép người dùng sửa hoặc hủy trước khi thao tác với lịch.\\\hline
+FR-03 & Người dùng có thể yêu cầu xem lịch trong một khoảng thời gian và nhận danh sách sự kiện có thời gian bắt đầu/kết thúc.\\\hline
+FR-04 & Người dùng có thể yêu cầu tạo sự kiện; ứng dụng kiểm tra tiêu đề và thời gian, làm rõ trường bắt buộc còn thiếu, rồi trình bày nội dung trước khi ghi nếu lệnh chưa đủ chắc chắn.\\\hline
+FR-05 & Người dùng có thể tìm và chọn đúng sự kiện cần cập nhật hoặc xóa; trước khi xóa phải nêu sự kiện mục tiêu và yêu cầu xác nhận.\\\hline
+FR-06 & Ứng dụng hỗ trợ OAuth 2.0 để kết nối tài khoản Google, hiển thị trạng thái kết nối và cho phép ngắt kết nối.\\\hline
+FR-07 & Ứng dụng thông báo kết quả thành công chỉ sau khi nhận phản hồi thành công từ API; nếu thất bại, hiển thị nguyên nhân phù hợp và bước tiếp theo.\\\hline
+FR-08 & Khi dữ liệu câu lệnh mơ hồ hoặc mức tin cậy thấp, ứng dụng hỏi lại thay vì tự tạo, sửa hoặc xóa sự kiện.\\\hline
+\end{longtable}
+
+\subsection{Yêu cầu phi chức năng}
+\begin{itemize}
+  \item \textbf{Bảo mật:} ưu tiên OAuth Authorization Code với PKCE; giới hạn scope, bảo vệ token bằng kho lưu trữ an toàn của hệ điều hành, không đưa token vào log hoặc renderer.
+  \item \textbf{Quyền riêng tư:} thông báo trạng thái microphone, cho phép tắt nghe, hạn chế lưu bản ghi âm và chỉ gửi âm thanh tới dịch vụ ngoài khi đã chọn phương án đám mây.
+  \item \textbf{Độ tin cậy:} thao tác ghi lịch phải có kiểm tra dữ liệu, xử lý timeout/mất mạng, chống gửi lặp khi có thể và xác minh kết quả sau khi gọi API.
+  \item \textbf{Khả năng bảo trì:} tách nghiệp vụ lịch khỏi nhà cung cấp STT/TTS; mỗi mô-đun có giao diện đầu vào/đầu ra và có thể kiểm thử độc lập.
+  \item \textbf{Khả năng sử dụng:} trạng thái nghe, nhận dạng, chờ xác nhận, đang thực hiện và lỗi phải phân biệt được; phản hồi cần ngắn gọn và nêu rõ hành động sẽ thực hiện.
+  \item \textbf{Hiệu năng:} đo thời gian theo từng giai đoạn và báo cáo p50/p95 trên cấu hình thử nghiệm xác định. Ngưỡng chấp nhận được thống nhất sau khi đo nguyên mẫu, không giả định trước khi có số liệu.
+\end{itemize}
+
+\section{Quy trình nghiệp vụ mục tiêu}
+\subsection{Luồng tạo sự kiện}
+\begin{enumerate}
+  \item Người dùng kích hoạt trợ lý và nói yêu cầu tạo lịch.
+  \item VAD xác định ranh giới câu; STT chuyển âm thanh thành văn bản và giao diện hiển thị kết quả.
+  \item NLU phân loại ý định \texttt{create\_event}, trích xuất tiêu đề, thời gian, thời lượng và thông tin tùy chọn.
+  \item Bộ suy luận thời gian dùng thời điểm tham chiếu và múi giờ để chuẩn hóa dữ liệu; bộ kiểm tra phát hiện thiếu tiêu đề, giờ, ngày hoặc khoảng thời gian không hợp lệ.
+  \item Nếu còn thiếu hoặc mơ hồ, trợ lý hỏi một câu làm rõ và giữ trạng thái tác vụ tạm thời. Nếu dữ liệu hợp lệ, trợ lý đọc lại tóm tắt và yêu cầu xác nhận theo chính sách an toàn.
+  \item Sau xác nhận, ứng dụng gọi API tạo sự kiện. Chỉ khi API trả về thành công, trợ lý mới thông báo đã tạo và hiển thị thông tin sự kiện.
+\end{enumerate}
+
+\subsection{Luồng xem, tìm và cập nhật sự kiện}
+Với yêu cầu xem lịch, ứng dụng xác định khoảng thời gian, gọi API đọc dữ liệu và trình bày các sự kiện theo thứ tự thời gian. Với yêu cầu cập nhật hoặc xóa, ứng dụng trước tiên tìm các ứng viên phù hợp bằng tên và thời gian; nếu có nhiều kết quả, phải liệt kê ngắn gọn để người dùng chọn. Sau khi chọn đúng sự kiện, ứng dụng trình bày thay đổi dự kiến; thao tác xóa luôn cần xác nhận tường minh. Khi API từ chối hoặc hết thời gian chờ, tác vụ không được đánh dấu hoàn tất.
+
+\subsection{Các luồng ngoại lệ}
+\begin{itemize}
+  \item \textbf{Không nhận dạng được câu nói:} thông báo chưa hiểu và cho phép thử lại, không phát sinh yêu cầu Calendar.
+  \item \textbf{Thiếu hoặc mơ hồ thời gian:} hỏi lại đúng trường còn thiếu, giữ các thực thể đã xác định trong tác vụ hiện tại.
+  \item \textbf{Chưa kết nối hoặc token hết hạn:} tạm dừng tác vụ, hướng dẫn người dùng kết nối lại; không yêu cầu nhập mật khẩu vào ứng dụng.
+  \item \textbf{Mất mạng, giới hạn API hoặc lỗi máy chủ:} thông báo rằng thao tác chưa được xác nhận, giữ nội dung yêu cầu để người dùng quyết định thử lại.
+  \item \textbf{Người dùng hủy hoặc ngắt lời:} hủy tác vụ chưa gửi; nếu yêu cầu đã gửi, kiểm tra trạng thái từ API trước khi đề xuất thử lại để tránh thao tác trùng.
+\end{itemize}
+
+\section{Kiến trúc tổng thể}
+Kiến trúc ban đầu chia thành các lớp: giao diện desktop; quản lý trạng thái hội thoại; bộ điều phối lệnh; adapter âm thanh và mô hình; lớp nghiệp vụ thời gian/sự kiện; adapter OAuth/Google Calendar; và lớp lưu cấu hình cục bộ. Mỗi adapter có thể được thay thế mà không đổi hợp đồng nghiệp vụ. Luồng chính đi từ microphone qua VAD, từ khóa đánh thức, STT, NLU và chuẩn hóa thời gian; sau bước kiểm tra/xác nhận, bộ điều phối mới gọi Calendar API và gửi kết quả đến giao diện/TTS.
+
+\begin{diagram}[H]
+\centering
+\begin{tikzpicture}[
+  box/.style={draw,rounded corners=2pt,minimum height=0.95cm,text width=2.35cm,align=center,font=\small},
+  arr/.style={-{Stealth[length=2.5mm]}}]
+  \node[box] (mic) {Microphone};
+  \node[box,right=0.45cm of mic] (vad) {VAD và wake word};
+  \node[box,right=0.45cm of vad] (stt) {STT};
+  \node[box,below=0.85cm of stt] (nlu) {NLU và thực thể};
+  \node[box,left=0.45cm of nlu] (time) {Chuẩn hóa thời gian};
+  \node[box,left=0.45cm of time] (confirm) {Kiểm tra và xác nhận};
+  \node[box,below=0.85cm of confirm] (cal) {Calendar API};
+  \node[box,right=0.45cm of cal] (reply) {Giao diện và phản hồi};
+  \node[box,right=0.45cm of reply] (tts) {TTS tùy chọn};
+  \draw[arr] (mic)--(vad); \draw[arr] (vad)--(stt);
+  \draw[arr] (stt)--(nlu); \draw[arr] (nlu)--(time);
+  \draw[arr] (time)--(confirm); \draw[arr] (confirm)--(cal);
+  \draw[arr] (cal)--(reply); \draw[arr] (reply)--(tts);
+\end{tikzpicture}
+\caption{Luồng xử lý chính của nguyên mẫu đề xuất}\label{dia:pipeline}
+\nguon{Nhóm thiết kế.}
+\end{diagram}
+
+\section{Thiết kế phân tích ý định và dữ liệu}
+Tập ý định tối thiểu gồm \texttt{list\_events}, \texttt{create\_event}, \texttt{find\_event}, \texttt{update\_event}, \texttt{delete\_event}, \texttt{cancel} và \texttt{unknown}. Kết quả phân tích gồm ý định, thực thể, độ tin cậy và các trường còn thiếu; kết quả này chưa trực tiếp gọi API. Lớp nghiệp vụ kiểm tra quyền, thời gian, sự kiện mục tiêu và chính sách xác nhận trước khi tạo lệnh Calendar.
+
+\begin{table}[H]
+\caption{Các trường sự kiện cần quản lý}\label{tab:event-fields}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{|>{\raggedright\arraybackslash}p{3.2cm}|>{\raggedright\arraybackslash}p{4.0cm}|>{\raggedright\arraybackslash}p{7.0cm}|}\hline
+\textbf{Trường} & \textbf{Bắt buộc khi tạo} & \textbf{Quy tắc ban đầu}\\\hline
+Tiêu đề & Có & Giữ nội dung người dùng cung cấp; hỏi lại nếu không xác định được.\\\hline
+Bắt đầu & Có & Chuẩn hóa từ biểu thức thời gian theo múi giờ đã chọn.\\\hline
+Kết thúc/thời lượng & Có theo quy tắc nghiệp vụ & Nếu người dùng chỉ nêu thời điểm bắt đầu, hỏi thời lượng hoặc áp dụng mặc định chỉ khi đã được công bố và xác nhận.\\\hline
+Múi giờ & Có về mặt xử lý & Mặc định ban đầu là \texttt{Asia/Ho\_Chi\_Minh}; cho phép thay đổi trong cấu hình.\\\hline
+Địa điểm/mô tả/người tham dự & Không & Chỉ ghi khi được người dùng nêu rõ; không suy diễn từ ngữ cảnh không chắc chắn.\\\hline
+Mã sự kiện & Có cho cập nhật/xóa & Lấy từ Calendar API; không định danh sự kiện chỉ bằng tiêu đề nếu có nhiều kết quả phù hợp.\\\hline
+\end{tabular}
+\nguon{Nhóm đề xuất từ nghiệp vụ sự kiện Google Calendar.}
+\end{table}
+
+\section{Thiết kế xử lý thời gian}
+Mọi phép suy luận thời gian sử dụng một đối tượng thời điểm tham chiếu cố định cho toàn bộ lượt lệnh để tránh thay đổi ngày trong lúc xử lý. Bộ phân tích tạo ra giá trị có cấu trúc gồm thời điểm bắt đầu, kết thúc hoặc thời lượng, múi giờ và mức độ đầy đủ. Bộ kiểm tra xác minh thời điểm kết thúc sau thời điểm bắt đầu, thời lượng hợp lệ và biểu thức ngày giờ không còn cách hiểu cạnh tranh.
+
+Nếu không thể xác định duy nhất thời điểm, hệ thống không chọn phương án ngầm định mà hỏi lại bằng cách đưa ra lựa chọn cụ thể, ví dụ xác nhận ngày hoặc buổi trong ngày. Các ca kiểm thử ban đầu cần bao gồm ngày tuyệt đối, ngày tương đối, thứ trong tuần, qua nửa đêm, thiếu năm, thiếu giờ, thiếu thời lượng và thay đổi múi giờ. Quy tắc cho sự kiện lặp lại sẽ được đưa ra ngoài phạm vi tối thiểu cho tới khi luồng sự kiện đơn được xác minh.
+
+\section{Quản lý trạng thái hội thoại}
+Hội thoại được mô hình hóa thành các trạng thái: \texttt{Idle}, \texttt{Listening}, \texttt{Recognizing}, \texttt{Interpreting}, \texttt{AwaitingClarification}, \texttt{AwaitingConfirmation}, \texttt{Executing}, \texttt{Speaking} và \texttt{Error}. Mỗi lượt lưu tạm ý định, thực thể đã xác định, trường còn thiếu, mã sự kiện được chọn (nếu có), nội dung đang chờ xác nhận và thời điểm hết hạn tác vụ. Khi người dùng trả lời câu hỏi làm rõ, chỉ gộp câu trả lời vào tác vụ hiện tại nếu ngữ cảnh còn hiệu lực; khi người dùng hủy hoặc hết hạn, xóa trạng thái chờ.
+
+Ở giai đoạn đầu, chỉ cần bộ nhớ ngắn hạn trong phiên và nhật ký kỹ thuật tối thiểu. Không cần bộ nhớ dài hạn để quản lý lịch; dữ liệu lịch vẫn thuộc quyền kiểm soát của Google Calendar. Bản ghi log không lưu âm thanh thô, access token, refresh token hoặc toàn bộ hội thoại theo mặc định.
+
+\section{Thiết kế kết nối Google Calendar}
+Màn hình cài đặt dự kiến có trạng thái chưa kết nối/đã kết nối, nút kết nối hoặc ngắt kết nối và thông tin giải thích quyền được yêu cầu. Khi kết nối, ứng dụng mở trình duyệt hệ thống để người dùng đăng nhập và cấp quyền; ứng dụng không dựng biểu mẫu nhập mật khẩu. Sau khi callback hợp lệ, token được gửi qua lớp dịch vụ đặc quyền và lưu trong kho bảo mật của hệ điều hành.
+
+Adapter Calendar cung cấp các thao tác đọc, tạo, cập nhật, xóa với kiểu dữ liệu nội bộ thống nhất. Lỗi API được ánh xạ thành nhóm có thể xử lý như chưa xác thực, không đủ quyền, không tìm thấy, xung đột dữ liệu, giới hạn tốc độ, timeout và lỗi máy chủ. Lớp giao diện chỉ nhận thông báo đã làm sạch, không nhận token hoặc chi tiết nhạy cảm của phản hồi thô.
