@@ -17,8 +17,10 @@
   <10> <10.95> <12> <13> <14.4> <17.28> <20.74> <24.88>cmex10
 }{}
 \usepackage{graphicx,xcolor,array,booktabs,longtable,multirow,enumitem}
+\usepackage{tabularx,fancyvrb}
+\IfFileExists{ragged2e.sty}{\usepackage{ragged2e}}{\newcommand{\RaggedRight}{\raggedright}}
 \usepackage{float,tikz}
-\usetikzlibrary{positioning,arrows.meta,calc,shapes.geometric}
+\usetikzlibrary{positioning,arrows.meta,calc,shapes.geometric,shapes.multipart,fit,backgrounds}
 
 % --- Khổ giấy: A4; top/bottom/right 2 cm, left 3 cm; header/footer ~1 cm
 \usepackage[a4paper,top=2cm,bottom=2cm,left=3cm,right=2cm,
@@ -34,6 +36,7 @@
   \let\@listi\@listI}
 \renewcommand\small{\@setfontsize\small{12}{14.4}}
 \renewcommand\footnotesize{\@setfontsize\footnotesize{11}{13.2}}
+\renewcommand\scriptsize{\@setfontsize\scriptsize{9.5}{11.4}}
 \makeatother
 \normalsize
 \linespread{1}
@@ -62,7 +65,10 @@
 \titlespacing*{\subsubsection}{0pt}{6pt}{3pt}
 
 % --- Header / Footer
+% Header trái: "Đồ án tốt nghiệp Đại học"; header phải: chương và tên chương.
+% Footer trái: tên sinh viên, tên lớp; footer phải: số trang.
 \usepackage{fancyhdr}
+\pagestyle{fancy}                  % để fancyhdr khởi tạo xong rồi mới định nghĩa lại các mark bên dưới
 \newcommand{\DATNstyle}{%
   \fancyhf{}
   \fancyhead[L]{\small Đồ án tốt nghiệp Đại học}
@@ -78,17 +84,96 @@
 % Chương không đánh số (LỜI CẢM ƠN, MỞ ĐẦU, ...): ghi tiêu đề IN HOA
 \newcommand{\unnumchapter}[1]{%
   \chapter*{#1}\addcontentsline{toc}{chapter}{#1}\markboth{}{#1}}
-\renewcommand{\chaptermark}[1]{\markboth{}{CHƯƠNG \thechapter: #1}}
+% Chương có đánh số: \chuong{TIÊU ĐỀ IN HOA}{Tiêu đề viết thường cho header}
+% (header luôn ghi "Chương n: tên chương"; tên mục không ghi đè lên header)
+\newcommand{\TenChuongHeader}{}
+\newcommand{\chuong}[2]{\renewcommand{\TenChuongHeader}{#2}\chapter{#1}}
+\renewcommand{\chaptermark}[1]{\markboth{}{Chương \thechapter: \TenChuongHeader}}
+\renewcommand{\sectionmark}[1]{}
+% Phụ lục: không đánh số chương, bảng/hình/sơ đồ đánh số PL.1, PL.2, ...
+\newcommand{\phuluc}{%
+  \unnumchapter{PHỤ LỤC}%
+  \setcounter{table}{0}\setcounter{figure}{0}\setcounter{diagram}{0}%
+  \renewcommand{\thetable}{PL.\arabic{table}}%
+  \renewcommand{\thefigure}{PL.\arabic{figure}}%
+  \renewcommand{\thediagram}{PL.\arabic{diagram}}}
+\makeatletter
+\newcommand{\mucphuluc}[1]{\par\addvspace{9pt}%
+  {\noindent\bfseries #1\addcontentsline{toc}{section}{#1}\par}\nobreak\vskip 2pt\@afterheading}
+\makeatother
 
 % --- Hình, bảng, sơ đồ: chú thích dưới hình/sơ đồ, trên bảng
+% Bảng ngắn, hình và sơ đồ dùng [!htbp] (thả nổi) để không để trống cuối trang; bảng dài dùng longtable.
+% flafter: không đặt hình/bảng trước chỗ nó được khai báo; \FloatBarrier (placeins): chặn không cho trôi qua một điểm.
+\usepackage{flafter}
+\IfFileExists{placeins.sty}{\usepackage{placeins}}{\providecommand{\FloatBarrier}{}}
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\bottomfraction}{0.8}
+\renewcommand{\textfraction}{0.08}
+\renewcommand{\floatpagefraction}{0.8}
+\setcounter{topnumber}{3}\setcounter{bottomnumber}{2}\setcounter{totalnumber}{4}
+\setlength{\textfloatsep}{12pt plus 3pt minus 2pt}
+\setlength{\intextsep}{10pt plus 3pt minus 2pt}
+\setlength{\floatsep}{10pt plus 3pt minus 2pt}
+\makeatletter   % trang chỉ chứa hình/bảng: xếp từ đầu trang thay vì canh giữa
+\setlength{\@fptop}{0pt}\setlength{\@fpsep}{14pt plus 2pt}\setlength{\@fpbot}{0pt plus 1fil}
+\makeatother
 \usepackage{caption}
 \captionsetup{font=small,labelfont=bf,labelsep=colon,skip=6pt}
 \captionsetup[table]{position=top}
+\captionsetup[longtable]{position=top}
 \newfloat{diagram}{htbp}{lod}[chapter]
 \floatname{diagram}{Sơ đồ}
 \captionsetup[diagram]{position=bottom}
 % Ghi chú nguồn dưới mỗi hình/bảng/sơ đồ (theo Mẫu 7)
 \newcommand{\nguon}[1]{\par\vspace{2pt}{\centering\small\itshape Nguồn: #1\par}}
+
+% --- Bảng: kiểu cột canh trái có độ rộng cố định, chữ nhỏ trong bảng
+\newcolumntype{L}[1]{>{\RaggedRight\arraybackslash}p{#1}}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\newcolumntype{Y}{>{\RaggedRight\arraybackslash}X}
+\newcommand{\bang}{\small\renewcommand{\arraystretch}{1.18}}
+\newcommand{\td}[1]{\textbf{#1}}     % ô tiêu đề cột
+\setlength{\LTpre}{6pt}\setlength{\LTpost}{2pt}
+
+% --- Mã nguồn, định danh kỹ thuật
+\newcommand{\ma}{\path}              % \ma{/api/v1/agent/command}: chữ đánh máy, tự xuống dòng tại / . _
+\DefineVerbatimEnvironment{code}{Verbatim}
+  {fontsize=\scriptsize,frame=single,framesep=4pt,rulecolor=\color{black!45},
+   xleftmargin=1pt,xrightmargin=1pt,baselinestretch=0.92}
+\fvset{listparameters=\setlength{\topsep}{4pt}\setlength{\partopsep}{0pt}}
+
+% --- Ảnh chụp màn hình: \anh[độ rộng]{tên tệp trong figures/}
+\newcommand{\anh}[2][0.86\textwidth]{{%
+  \setlength{\fboxsep}{0pt}\setlength{\fboxrule}{0.3pt}%
+  \IfFileExists{figures/#2}
+    {\fbox{\includegraphics[width=#1]{figures/#2}}}
+    {\fbox{\parbox[c][5cm][c]{#1}{\centering\small Chèn ảnh: \texttt{figures/\detokenize{#2}}}}}}}
+
+% --- Kiểu vẽ sơ đồ TikZ dùng chung
+\tikzset{
+  hop/.style={draw,rounded corners=2pt,minimum height=0.8cm,align=center,font=\footnotesize,inner sep=4pt},
+  hopdam/.style={hop,fill=black!8},
+  nhom/.style={draw,dashed,rounded corners=3pt,inner sep=7pt},
+  mui/.style={-{Stealth[length=2.2mm]},line width=0.5pt},
+  muihai/.style={{Stealth[length=2.2mm]}-{Stealth[length=2.2mm]},line width=0.5pt},
+  nhan/.style={font=\scriptsize,align=center,inner sep=1.5pt},
+  nhannen/.style={nhan,fill=white},
+  seqhead/.style={draw,fill=black!8,minimum height=0.95cm,align=center,font=\scriptsize\bfseries,inner sep=3pt},
+  seqline/.style={dashed,line width=0.4pt,black!55},
+  seqmsg/.style={-{Stealth[length=2mm]},line width=0.5pt},
+  seqret/.style={-{Stealth[length=2mm]},dashed,line width=0.5pt},
+  seqtxt/.style={font=\scriptsize,align=center,inner sep=1.5pt,fill=white},
+  uc/.style={draw,ellipse,align=center,font=\footnotesize,inner sep=1.5pt,minimum height=0.85cm,minimum width=3.3cm},
+  thucthe/.style={draw,rectangle split,rectangle split parts=2,rectangle split part fill={black!8,white},
+                  align=left,font=\scriptsize,inner sep=3pt,text width=3.7cm},
+  trangthai/.style={draw,rounded corners=8pt,minimum height=0.95cm,minimum width=2.6cm,align=center,font=\footnotesize},
+}
+% Thông điệp trong sơ đồ tuần tự: \tn{y}{x đầu}{x cuối}{nội dung} (nét liền), \tnve (nét đứt, trả về),
+% \tntu[neo]{y}{x}{nội dung} (bước tự xử lý, vẽ thành hộp trên đường sống)
+\newcommand{\tn}[4]{\draw[seqmsg] (#2,-#1) -- node[seqtxt,above=0.6pt]{#4} (#3,-#1);}
+\newcommand{\tnve}[4]{\draw[seqret] (#2,-#1) -- node[seqtxt,above=0.6pt]{#4} (#3,-#1);}
+\newcommand{\tntu}[4][center]{\node[seqtxt,draw,rounded corners=1pt,inner sep=2.5pt,anchor=#1] at (#3,-#2) {#4};}
 
 % --- Mục lục & Danh mục bảng, sơ đồ, hình vẽ
 \usepackage{tocloft}
@@ -116,9 +201,9 @@
 \makeatletter\let\l@diagram\l@sodo\makeatother
 \renewcommand{\cftsodopresnum}{SƠ ĐỒ~}
 \setlength{\cftsodoindent}{1.5em}
-\setlength{\cfttabnumwidth}{5.6em}
-\setlength{\cftfignumwidth}{5.6em}
-\setlength{\cftsodonumwidth}{5.6em}
+\setlength{\cfttabnumwidth}{6.4em}
+\setlength{\cftfignumwidth}{6.4em}
+\setlength{\cftsodonumwidth}{6.4em}
 \renewcommand{\cfttabfont}{\small}
 \renewcommand{\cftfigfont}{\small}
 \renewcommand{\cftsodofont}{\small}
@@ -129,3 +214,4 @@
 
 % --- Siêu liên kết (không tô màu để in)
 \usepackage[hidelinks,unicode,hypertexnames=false,pdftitle={\TenDeTai}]{hyperref}
+\Urlmuskip=0mu

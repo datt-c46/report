@@ -1,47 +1,363 @@
-\chapter{KẾ HOẠCH TRIỂN KHAI VÀ KIỂM THỬ}
+\chuong{TRIỂN KHAI, KIỂM THỬ VÀ ĐÁNH GIÁ}{Triển khai, kiểm thử và đánh giá}
 \label{ch:impl}
 
-\section{Nguyên tắc triển khai}
-Đợt đầu ưu tiên dựng các hợp đồng giữa mô-đun và kiểm tra nghiệp vụ trước khi tối ưu mô hình. Các cổng biên cần được thiết kế độc lập: âm thanh thành văn bản; văn bản thành ý định/thực thể; biểu thức thời gian thành khoảng thời gian; thao tác nghiệp vụ thành yêu cầu Calendar API; và kết quả API thành thông báo người dùng. Mỗi cổng có kiểm thử đơn vị để lỗi của mô hình tiếng nói không che khuất lỗi nghiệp vụ.
+Chương này trình bày môi trường và cách triển khai hai phần mềm của hệ thống, kết quả hiện thực các chức năng, kết quả kiểm thử tự động, đánh giá mức độ đáp ứng yêu cầu, các hạn chế và tiến độ so với kế hoạch đã nêu ở báo cáo định kỳ lần 1.
 
-Nền tảng desktop đề xuất là Electron với TypeScript để dùng chung ngôn ngữ cho giao diện và phần điều phối, phù hợp với thư viện tích hợp web. Đây là lựa chọn thiết kế ban đầu, cần được xác nhận bằng nguyên mẫu. Nếu sử dụng Electron, cần bật sandbox/context isolation, tắt quyền Node.js trong renderer, chỉ công bố các hàm IPC tối thiểu và xác thực dữ liệu ở tiến trình chính theo khuyến nghị bảo mật của Electron \cite{electronsecurity}. Chưa chốt engine VAD, wake word, STT hay TTS: chúng sẽ được so sánh theo hỗ trợ tiếng Việt, quyền riêng tư, giấy phép, tài nguyên, độ trễ và chất lượng.
+\section{Môi trường và công cụ}
+Bảng~\ref{tab:versions} liệt kê phần mềm và phiên bản đang dùng (lấy từ tệp khai báo phụ thuộc và tệp khóa phiên bản của hai kho mã). Bảng~\ref{tab:loc} tóm tắt quy mô mã nguồn tại thời điểm báo cáo.
 
-\section{Các giai đoạn công việc}
-\begin{enumerate}
-  \item \textbf{Khảo sát và thiết kế:} thống nhất phạm vi, luồng nghiệp vụ, yêu cầu và chính sách xác nhận; hoàn thành trong báo cáo định kỳ lần 1.
-  \item \textbf{Nguyên mẫu âm thanh:} kiểm tra quyền microphone, trạng thái nghe, VAD, wake word và thu một câu lệnh; ghi nhận khả năng chạy trên máy mục tiêu.
-  \item \textbf{Nguyên mẫu hiểu lệnh:} tạo tập câu tiếng Việt có đáp án chuẩn, thực hiện STT, phân loại ý định, trích xuất thực thể và làm rõ trường thiếu.
-  \item \textbf{Tích hợp Calendar:} dựng OAuth với PKCE, lưu token an toàn, đọc lịch trước; sau đó mới thử tạo/cập nhật/xóa trên lịch thử nghiệm riêng.
-  \item \textbf{Tích hợp hội thoại và phản hồi:} bổ sung xác nhận, hủy, xử lý lỗi, giao diện trạng thái và TTS tùy chọn.
-  \item \textbf{Đánh giá và hoàn thiện:} chạy bộ ca kiểm thử, đo chất lượng và độ trễ, xử lý các lỗi ưu tiên cao, ghi rõ giới hạn còn lại.
-\end{enumerate}
-
-\section{Kế hoạch kiểm thử}
-\begin{table}[H]
-\caption{Ma trận kiểm thử ban đầu}\label{tab:test-plan}
-\renewcommand{\arraystretch}{1.15}
-\begin{tabular}{|>{\raggedright\arraybackslash}p{2.6cm}|>{\raggedright\arraybackslash}p{5.2cm}|>{\raggedright\arraybackslash}p{6.3cm}|}\hline
-\textbf{Nhóm} & \textbf{Tình huống} & \textbf{Kết quả mong đợi}\\\hline
-Nhận dạng & Câu lệnh tiếng Việt rõ, có nhiễu nền và có khoảng dừng giữa câu. & Ghi nhận bản chép; báo không chắc chắn thay vì tự thực thi khi nhận dạng thiếu tin cậy.\\\hline
-Ý định/thực thể & Xem, tạo, tìm, sửa, xóa; thiếu ngày, thiếu giờ, nhiều sự kiện cùng tên. & Đúng ý định; trường thiếu được hỏi; sự kiện mục tiêu được phân biệt rõ.\\\hline
-Thời gian & Ngày tuyệt đối, “ngày mai”, thứ trong tuần, qua nửa đêm và múi giờ. & Thời điểm chuẩn hóa nhất quán; trường hợp mơ hồ được làm rõ.\\\hline
-Nghiệp vụ lịch & Tạo, đọc, cập nhật, xóa; hủy trước xác nhận; xác nhận xóa. & Chỉ thay đổi dữ liệu theo đúng thao tác đã xác nhận; phản hồi dựa trên kết quả API.\\\hline
-OAuth/API & Từ chối cấp quyền, token hết hạn, mất mạng, không đủ quyền, timeout và giới hạn tốc độ. & Không lộ token; không báo thành công giả; hướng dẫn kết nối lại hoặc thử lại an toàn.\\\hline
-Ứng dụng desktop & Tắt microphone, chạy nền, thoát ứng dụng, mất kết nối khi đang chờ. & Trạng thái hiển thị đúng; tác vụ được hủy hoặc khôi phục có kiểm soát.\\\hline
-\end{tabular}
-\nguon{Nhóm đề xuất; từng ca sẽ được mở rộng trong giai đoạn hiện thực.}
+\begin{table}[!htbp]
+\caption{Phần mềm và phiên bản sử dụng}\label{tab:versions}
+\bang
+\begin{tabularx}{\textwidth}{|L{2.4cm}|L{5.7cm}|Y|}\hline
+\td{Phần} & \td{Thành phần – phiên bản} & \td{Vai trò}\\\hline
+\multirow{6}{=}{Backend} & Node.js 22 (yêu cầu từ 22.12), TypeScript 5.9 & Môi trường chạy và ngôn ngữ\\\cline{2-3}
+ & Fastify 5.12 và các plugin helmet, cors, rate-limit, jwt, multipart, websocket, swagger & Máy chủ HTTP/WebSocket, bảo mật, tài liệu API\\\cline{2-3}
+ & zod 4.6, fastify-type-provider-zod 7.0 & Lược đồ dữ liệu, sinh OpenAPI 3.1\\\cline{2-3}
+ & PostgreSQL 16, Prisma 7.10 & Cơ sở dữ liệu, ORM và migration\\\cline{2-3}
+ & googleapis 189, google-auth-library 11.3, @google/genai 2.32 & Google Calendar, OAuth, Gemini\\\cline{2-3}
+ & luxon 3.7, chrono-node 2.10 & Xử lý ngày giờ\\\hline
+\multirow{4}{=}{Ứng dụng desktop} & Electron 39.8, electron-vite 5.0, Vite 7.3 & Nền tảng desktop và công cụ dựng\\\cline{2-3}
+ & React 19.3, TypeScript 5.9 & Giao diện\\\cline{2-3}
+ & @ricky0123/vad-web 0.0.31, onnxruntime-web 1.30 & Silero VAD chạy trong ứng dụng\\\cline{2-3}
+ & electron-builder 26.15 & Đóng gói cho Windows, macOS, Linux\\\hline
+\multirow{3}{=}{Mô hình, dịch vụ} & Gemini: mô hình mặc định \texttt{gemini-3.8-flash}, dự phòng \texttt{gemini-3.5-flash-lite} (cấu hình được) & STT và trích xuất ý định\\\cline{2-3}
+ & Piper với giọng tiếng Việt \texttt{vi\_VN-vivos-x\_low} & TTS\\\cline{2-3}
+ & Silero VAD (tệp ONNX đi kèm thư viện vad-web) & VAD\\\hline
+\multirow{2}{=}{Kiểm thử, đóng gói} & Vitest 5.1; \texttt{node:test} chạy qua tsx 4.23 & Kiểm thử backend; kiểm thử ứng dụng desktop\\\cline{2-3}
+ & Docker, Docker Compose; tsup 9.0 & Đóng gói và dựng backend\\\hline
+\end{tabularx}
+\nguon{Tệp \texttt{package.json}, \texttt{package-lock.json} của backend và \texttt{pnpm-lock.yaml} của ứng dụng desktop.}
 \end{table}
 
-\section{Chỉ số đánh giá}
-\begin{itemize}
-  \item \textbf{STT:} WER trên tập câu có bản chép tham chiếu; phân tách kết quả theo môi trường âm thanh và nhóm câu lệnh.
-  \item \textbf{Hiểu lệnh:} độ chính xác ý định; độ chính xác từng trường quan trọng như ngày, giờ và tiêu đề; tỷ lệ hỏi lại đúng khi dữ liệu thiếu.
-  \item \textbf{Wake word/VAD:} tỷ lệ bỏ sót, tỷ lệ kích hoạt nhầm trên thời lượng chạy nền, thời gian xác định kết thúc câu và mức sử dụng CPU.
-  \item \textbf{Calendar:} tỷ lệ thao tác hoàn tất đúng trên lịch thử nghiệm, tỷ lệ thao tác bị trùng và khả năng phục hồi khi API trả lỗi.
-  \item \textbf{Độ trễ:} thời gian theo từng mô-đun và đầu-cuối; báo cáo p50/p95, số mẫu, cấu hình máy, mạng và trạng thái tải mô hình.
-  \item \textbf{Quyền riêng tư/an toàn:} xác minh không ghi token vào log, không gửi yêu cầu khi chưa xác nhận theo chính sách và microphone dừng khi người dùng tắt.
-\end{itemize}
-Các chỉ số sẽ được đo bằng tập dữ liệu và môi trường được mô tả rõ. Báo cáo lần 1 mới xác định cách đo; chưa có số liệu để kết luận mô hình hoặc phương án nào tốt hơn.
+\begin{table}[!htbp]
+\caption{Quy mô mã nguồn tại thời điểm báo cáo}\label{tab:loc}
+\bang
+\begin{tabularx}{\textwidth}{|L{5.2cm}|C{2.2cm}|C{2.4cm}|Y|}\hline
+\td{Phần} & \td{Số tệp} & \td{Số dòng} & \td{Ghi chú}\\\hline
+Backend – mã nguồn & 128 & 14.338 & Không tính mã do Prisma sinh; 7 mô-đun\\\hline
+Backend – kiểm thử & 94 & 17.363 & 78 tệp kiểm thử và các tệp giả lập, hỗ trợ\\\hline
+Ứng dụng desktop – mã nguồn & 58 & 7.313 & Main, preload, renderer, phần dùng chung\\\hline
+Ứng dụng desktop – kiểm thử & 17 & 4.261 & 10 tệp kiểm thử đơn vị, 2 bộ đầu-cuối và phần hỗ trợ\\\hline
+\end{tabularx}
+\nguon{Nhóm thống kê từ hai kho mã (tệp TypeScript). Backend công bố 31 thao tác HTTP trên 27 đường dẫn cùng một kênh WebSocket, dùng 9 bảng dữ liệu; ứng dụng desktop có 17 kênh IPC.}
+\end{table}
 
-\section{Phạm vi kết quả của báo cáo định kỳ lần 1}
-Sản phẩm của giai đoạn hiện tại là phạm vi bài toán, tổng hợp cơ sở lý thuyết, yêu cầu chức năng/phi chức năng, quy trình nghiệp vụ và kiến trúc nguyên mẫu. Các thành phần trong kế hoạch ở trên chưa được xem là đã triển khai hoặc kiểm thử nếu chưa có bằng chứng từ mã nguồn và kết quả chạy. Giai đoạn tiếp theo tập trung tạo nguyên mẫu nhỏ, kiểm chứng giả định về tiếng Việt và quyền truy cập Calendar, sau đó mới chốt công nghệ.
+\section{Triển khai backend}
+\subsection{Cấu trúc mã nguồn}
+Mã nguồn backend được tổ chức theo mô-đun; các thư mục chính như sau:
+\begin{code}
+voice-backend/
+  docs/         DESIGN.md (hợp đồng thiết kế), CLIENT_INTEGRATION.md, openapi.json
+  prisma/       schema.prisma, migrations/
+  docker/       entrypoint.sh
+  src/
+    server.ts, app.ts, container.ts     khởi động, lắp ráp plugin và mô-đun
+    config/env.ts                       đọc và kiểm tra biến môi trường
+    lib/                                lỗi, mật mã, access token, đồng hồ, múi giờ
+    plugins/                            bảo mật, xác thực JWT, xử lý lỗi, swagger
+    modules/   health, auth, users, calendar, agent (nlu/), voice (stt/, tts/), realtime
+  test/
+    unit/  integration/  helpers/fakes/  setup/global-db.ts
+\end{code}
+
+\subsection{Cấu hình và khởi chạy}
+Dịch vụ cần ba biến bắt buộc: chuỗi kết nối cơ sở dữ liệu (\ma{DATABASE_URL}), bí mật ký JWT (\ma{JWT_SECRET}, tối thiểu 32 ký tự) và khóa mã hóa token (\ma{TOKEN_ENCRYPTION_KEY}, 32 byte mã hóa base64). Các nhóm tùy chọn gồm thông tin client OAuth của Google, khóa Gemini và đường dẫn Piper; thiếu nhóm nào thì chức năng tương ứng trả lỗi có mã rõ ràng trong khi phần còn lại vẫn hoạt động (ví dụ thiếu client Google thì vẫn dùng được lịch nội bộ). Danh sách biến chính nằm ở Phụ lục.
+
+Triển khai bằng Docker Compose gồm ba dịch vụ: \textit{postgres} (dữ liệu thật), \textit{postgres-test} (dữ liệu trên bộ nhớ, dành cho kiểm thử) và \textit{api}. Ảnh \textit{api} được dựng nhiều giai đoạn, chạy bằng người dùng không phải root; khi khởi động, nó áp dụng các migration rồi mới chạy máy chủ.
+\begin{code}
+cp .env.example .env                # điền JWT_SECRET, TOKEN_ENCRYPTION_KEY
+                                    # (khóa Google, Gemini là tùy chọn)
+docker compose up -d --build
+curl http://localhost:4000/health   # {"status":"ok","uptimeSeconds":...,"version":...}
+curl http://localhost:4000/ready    # {"status":"ok","db":"up"}
+\end{code}
+Khi phát triển, backend chạy trực tiếp bằng \texttt{npm run dev}; giao diện Swagger tại \ma{/docs} hiển thị đặc tả OpenAPI được sinh tự động từ lược đồ của các tuyến. Một ca kiểm thử bảo đảm tệp đặc tả lưu trong kho mã luôn khớp với mã nguồn.
+
+\subsection{Chế độ phát triển không cần dịch vụ ngoài}
+Để phát triển và kiểm thử mà không cần tài khoản Google, khóa Gemini hay Piper, backend có: đăng nhập phát triển (\ma{AUTH_DEV_LOGIN_ENABLED}) tạo người dùng với lịch nội bộ; bộ STT giả lập chỉ đọc bản chép nhúng sẵn trong tệp WAV kiểm thử; bộ TTS giả lập. Cả ba đều là lựa chọn cấu hình tường minh; hai lựa chọn đầu bị từ chối khi chạy ở chế độ production.
+
+\section{Triển khai ứng dụng desktop}
+Ứng dụng được dựng bằng electron-vite thành ba gói: \textit{main}, \textit{preload} và \textit{renderer}. Cấu hình duy nhất cần thiết là địa chỉ backend:
+\begin{code}
+pnpm install
+echo "VOICE_BACKEND_URL=http://localhost:4000" > .env
+pnpm dev                    # chạy ở chế độ phát triển
+pnpm build:win              # hoặc build:mac, build:linux để đóng gói
+\end{code}
+Các tệp mô hình VAD (ONNX) và runtime WebAssembly được sao chép vào gói giao diện để ứng dụng đóng gói nạp được từ đĩa mà không cần mạng. Mô hình giọng Piper không còn đóng gói kèm ứng dụng vì việc tổng hợp đã chuyển về máy chủ.
+
+\section{Kết quả hiện thực chức năng}
+Phần này minh họa các chức năng bằng ảnh chụp từ ứng dụng đang chạy với backend thật. Ảnh được tạo bằng công cụ chụp tự động của dự án (lệnh \texttt{pnpm ui:shots} và kịch bản tương tự), trong cấu hình kiểm thử đầu-cuối: đăng nhập bằng tài khoản phát triển, lịch nội bộ trên máy chủ, bộ trích xuất ý định dựa trên luật, TTS giả lập; riêng lệnh giọng nói dùng microphone giả lập phát một tệp ghi âm và dịch vụ Gemini được thay bằng máy chủ giả lập cục bộ trả bản chép định sẵn. Thời điểm chạy là ngày 22/11/2026 (Chủ nhật), múi giờ Asia/Bangkok.
+
+\subsection{Đăng nhập}
+Khi chưa đăng nhập (Hình~\ref{fig:signed-out}), ứng dụng hiển thị địa chỉ backend đang kết nối, nút “Đăng nhập bằng Google” và — chỉ khi được cấu hình cho môi trường phát triển — nút “Đăng nhập dev”. Mọi điều khiển ra lệnh đều bị khóa. Sau khi đăng nhập, thanh tiêu đề hiển thị email, nguồn lịch đang dùng (Google Calendar hoặc lịch nội bộ) và múi giờ.
+
+\begin{figure}[!htbp]
+\centering
+\anh[0.78\textwidth]{ui-01-signed-out.png}
+\caption{Màn hình khi chưa đăng nhập: ô nhập lệnh và nút nghe bị khóa}\label{fig:signed-out}
+\nguon{Ảnh chụp ứng dụng của nhóm.}
+\end{figure}
+
+\subsection{Tạo và xem sự kiện}
+Ở Hình~\ref{fig:create}, câu “Chiều mai lúc 3 giờ họp với thầy hướng dẫn” được hiểu thành sự kiện “Họp với thầy hướng dẫn” từ 15:00 đến 16:00 ngày hôm sau: buổi “chiều” quyết định 3 giờ là 15:00, thời lượng mặc định 60 phút, tiêu đề được tách khỏi các từ chỉ thời gian. Mỗi câu trả lời kèm thẻ sự kiện và nhãn ý định (“Tạo lịch”) để người dùng kiểm tra hệ thống đã hiểu thế nào.
+
+\begin{figure}[!htbp]
+\centering
+\anh{ui-02-create.png}
+\caption{Tạo sự kiện bằng câu lệnh tiếng Việt có thời gian tương đối}\label{fig:create}
+\nguon{Ảnh chụp ứng dụng của nhóm (đã cắt phần ô nhập lệnh phía dưới).}
+\end{figure}
+
+\subsection{Sửa, xóa với bước xác nhận}
+Với lệnh dời lịch (Hình~\ref{fig:update-confirm}), hệ thống tìm sự kiện theo thời điểm người dùng nêu (“lúc 3 giờ chiều ngày mai”), tính thời điểm mới với thời lượng giữ nguyên, rồi \textit{dừng lại hỏi}: câu trả lời nêu rõ sự kiện, giờ cũ, giờ mới và hai nút “Xác nhận”, “Hủy”. Chỉ sau khi người dùng xác nhận, sự kiện mới được cập nhật và trợ lý báo “Đã cập nhật lịch \ldots”. Hình~\ref{fig:delete-rejected} cho thấy cách xác nhận thứ hai: người dùng trả lời “không” cho câu hỏi xóa, hệ thống hủy thao tác và báo sự kiện được giữ nguyên.
+
+\begin{figure}[!htbp]
+\centering
+\anh{ui-03-update-confirm.png}
+\caption{Yêu cầu xác nhận trước khi dời lịch, kèm thay đổi đề xuất}\label{fig:update-confirm}
+\nguon{Ảnh chụp ứng dụng của nhóm (đã cắt phần ô nhập lệnh phía dưới).}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\anh{ui-04-delete-rejected.png}
+\caption{Hủy thao tác xóa bằng cách trả lời “không” trong cùng hội thoại}\label{fig:delete-rejected}
+\nguon{Ảnh chụp ứng dụng của nhóm (đã cắt phần ô nhập lệnh phía dưới).}
+\end{figure}
+
+\subsection{Kiểm tra lịch trống và hỏi lại khi thiếu thông tin}
+Hình~\ref{fig:availability} minh họa hai tình huống. Với “Chiều mai tôi có rảnh không?”, hệ thống diễn giải “chiều” thành khoảng 12:00–18:00 và liệt kê sự kiện gây bận. Với “Tạo lịch họp với khách hàng” (không có ngày giờ), hệ thống không tự chọn thời điểm mà hỏi lại “Bạn muốn đặt lịch \ldots{} vào lúc nào?”.
+
+\begin{figure}[!htbp]
+\centering
+\anh{ui-05-availability-clarify.png}
+\caption{Kiểm tra lịch trống theo buổi và câu hỏi làm rõ khi lệnh tạo thiếu thời gian}\label{fig:availability}
+\nguon{Ảnh chụp ứng dụng của nhóm (đã cắt phần ô nhập lệnh phía dưới).}
+\end{figure}
+
+\subsection{Lệnh giọng nói và thông tin độ trễ}
+Khi bật chế độ nghe, bảng điều khiển microphone hiển thị trạng thái của pipeline (đang nghe, đang nhận dạng, trợ lý đang đọc, hoàn tất) cùng bản chép câu nói. Mục “Chi tiết” (Hình~\ref{fig:voice}) hiển thị thời gian từng giai đoạn của lượt lệnh: STT, Agent, TTFS, TTS và tổng. Trong lúc trợ lý đọc, giao diện báo “Micro tạm dừng để tránh thu lại tiếng loa”; người dùng có thể dừng đọc hoặc nghe lại.
+
+\begin{figure}[!htbp]
+\centering
+\anh[0.78\textwidth]{ui-06-voice-details.png}
+\caption{Kết quả một lệnh giọng nói và bảng chi tiết các giai đoạn xử lý}\label{fig:voice}
+\nguon{Ảnh chụp ứng dụng của nhóm. Các số đo trong ảnh thuộc cấu hình kiểm thử (STT và TTS giả lập), không phải số đo hiệu năng với dịch vụ thật.}
+\end{figure}
+
+\subsection{Tổng hợp kịch bản hội thoại đã chạy}
+Bảng~\ref{tab:dialog} ghi lại chuỗi mười lượt tương tác (gõ lệnh, bấm nút, nói) đã chạy liên tiếp trong một phiên làm việc của ứng dụng, kèm ý định mà hệ thống nhận diện và phản hồi nhận được.
+
+\begin{table}[!htbp]
+\caption{Chuỗi câu lệnh đã chạy trên hệ thống và phản hồi nhận được}\label{tab:dialog}
+\bang
+\begin{tabularx}{\textwidth}{|C{0.6cm}|L{4.2cm}|L{3.1cm}|Y|}\hline
+\td{\#} & \td{Câu lệnh} & \td{Ý định} & \td{Phản hồi của hệ thống (rút gọn)}\\\hline
+1 & Tạo lịch họp nhóm đồ án ngày mai lúc 9 giờ & {\footnotesize CREATE\_\allowbreak EVENT} & Đã tạo lịch “Họp nhóm đồ án” (09:00 – 10:00, Thứ Hai 23/11/2026).\\\hline
+2 & Chiều mai lúc 3 giờ họp với thầy hướng dẫn & {\footnotesize CREATE\_\allowbreak EVENT} & Đã tạo lịch “Họp với thầy hướng dẫn” (15:00 – 16:00, Thứ Hai 23/11/2026).\\\hline
+3 & Ngày mai tôi có lịch gì? & {\footnotesize LIST\_\allowbreak EVENTS} & Bạn có 2 lịch vào Thứ Hai 23/11/2026: \ldots\\\hline
+4 & Dời cuộc họp lúc 3 giờ chiều ngày mai sang 4 giờ & {\footnotesize UPDATE\_\allowbreak EVENT} (chờ xác nhận) & Bạn có muốn đổi lịch “Họp với thầy hướng dẫn” (15:00 – 16:00) thành 16:00 – 17:00, Thứ Hai 23/11/2026?\\\hline
+5 & (bấm nút Xác nhận) & {\footnotesize CONFIRM\_\allowbreak ACTION} & Đã cập nhật lịch “Họp với thầy hướng dẫn” (16:00 – 17:00, Thứ Hai 23/11/2026).\\\hline
+6 & Xóa lịch họp nhóm đồ án ngày mai & {\footnotesize DELETE\_\allowbreak EVENT} (chờ xác nhận) & Bạn có chắc muốn xóa lịch “Họp nhóm đồ án” (09:00 – 10:00, Thứ Hai 23/11/2026)?\\\hline
+7 & không & {\footnotesize REJECT\_\allowbreak ACTION} & Đã hủy thao tác, lịch “Họp nhóm đồ án” được giữ nguyên.\\\hline
+8 & Chiều mai tôi có rảnh không? & {\footnotesize CHECK\_\allowbreak AVAILABILITY} & Bạn bận trong khoảng 12:00 – 18:00, Thứ Hai 23/11/2026: Họp với thầy hướng dẫn (16:00 – 17:00).\\\hline
+9 & Tạo lịch họp với khách hàng & {\footnotesize CREATE\_\allowbreak EVENT} (thiếu thời gian) & Bạn muốn đặt lịch “Họp với khách hàng” vào lúc nào?\\\hline
+10 & (nói) Ngày mai tôi có lịch gì & {\footnotesize LIST\_\allowbreak EVENTS} & Bạn có 2 lịch vào Thứ Hai 23/11/2026: \ldots{} (kèm giọng đọc)\\\hline
+\end{tabularx}
+\nguon{Kết quả chạy ngày 22/11/2026 trong cấu hình kiểm thử đầu-cuối mô tả ở đầu mục; bản chép của câu 10 do dịch vụ STT giả lập trả về.}
+\end{table}
+
+\section{Rà soát nguyên mẫu ban đầu và các cải tiến}\label{sec:audit}
+Trước khi tái kiến trúc, nhóm rà soát toàn bộ mã nguồn, bộ kiểm thử và tài liệu của nguyên mẫu đơn khối (đợt rà soát ngày 04/11/2026). Mỗi phát hiện được kiểm chứng lại bằng cách đọc mã và chạy thử; chỉ các lỗi được xác nhận mới được ghi nhận. Kết quả: \textbf{77 lỗi được xác nhận}, gồm 12 lỗi mức cao, 33 lỗi mức trung bình và 32 lỗi mức thấp. Bảng~\ref{tab:audit} tóm tắt các nhóm vấn đề nghiêm trọng nhất và cách kiến trúc mới giải quyết.
+
+\FloatBarrier
+{\bang
+\begin{longtable}{|L{7.1cm}|L{7.6cm}|}
+\caption{Các vấn đề chính của nguyên mẫu và cách khắc phục trong kiến trúc mới}\label{tab:audit}\\\hline
+\td{Vấn đề phát hiện ở nguyên mẫu} & \td{Cách khắc phục}\\\hline
+\endfirsthead
+\hline\td{Vấn đề phát hiện ở nguyên mẫu} & \td{Cách khắc phục}\\\hline
+\endhead
+Khi STT lỗi hoặc thiếu khóa, ứng dụng chuyển sang bộ giả lập trả về các câu lệnh mẫu (tạo, dời, xóa lịch) và agent thực thi chúng trên lịch thật. & Bộ giả lập chỉ đọc bản chép nhúng trong tệp kiểm thử và bị cấm ở production; không có STT thì trả lỗi 503.\\\hline
+Preload chuyển toàn bộ biến môi trường, gồm khóa Gemini và client secret của Google, sang tiến trình giao diện. & Mọi bí mật chỉ còn ở máy chủ; ứng dụng chỉ đọc địa chỉ backend.\\\hline
+Lệnh sửa/xóa chạy ngay không hỏi lại; khi không khớp được sự kiện, ứng dụng chọn một sự kiện bất kỳ, kể cả sự kiện cũ nhất trong lịch. & Thao tác chờ xác nhận có thời hạn; chấm điểm theo tên và độ gần thời gian; hỏi lại khi mơ hồ; không bao giờ lấy sự kiện cũ nhất.\\\hline
+Từ khóa ngắn hoặc không dấu trùng với tên người, từ thường khiến lệnh tạo bị hiểu thành xóa/sửa; con số đầu tiên trong câu (“thứ 2”, “phòng 402”) bị coi là giờ; dời lịch tính sai giờ mới. & Viết lại bộ luật và ngữ pháp thời gian với đồng hồ, múi giờ được truyền vào; bảng ca kiểm thử chạy ở nhiều múi giờ; bổ sung Gemini với kiểm tra chéo.\\\hline
+Giờ không kèm buổi được gán sáng/chiều theo giờ hiện tại, nên cùng một câu cho kết quả khác nhau tùy lúc nói. & Quy tắc diễn giải giờ tất định (Bảng~\ref{tab:hours}).\\\hline
+Không có Piper nhưng vẫn báo khả dụng và phát tiếng bíp thay cho giọng đọc. & Không có Piper thì trả 503; Piper chạy có kiểm soát (không qua shell, có thời gian chờ, giới hạn tiến trình).\\\hline
+Lịch: không phân biệt sự kiện cả ngày, không phân trang, không thử lại khi quá tải; token bị thu hồi vẫn báo “đã đăng nhập”. & Hỗ trợ sự kiện cả ngày, phân trang, thử lại có giãn cách; mã lỗi yêu cầu đăng nhập Google lại.\\\hline
+OAuth loopback không có PKCE; xin quyền lịch rộng hơn cần thiết; token có thể bị ghi dạng rõ. & PKCE ở hai chặng, \textit{state} dùng một lần, quyền tối thiểu \texttt{calendar.events}; token Google mã hóa ở máy chủ; phiên phía ứng dụng chỉ ghi đĩa khi mã hóa được.\\\hline
+Bấm dừng không hủy được lệnh đang chạy; câu trả lời bị tổng hợp giọng hai lần; âm thanh cũ vẫn phát sau khi dừng. & Sửa trong đợt chuyển giao diện sang dùng backend; có kiểm thử đầu-cuối cho luồng giọng nói.\\\hline
+Lệnh kiểm thử mặc định chỉ chạy 1 trong 12 tệp; một số ca phụ thuộc khóa API thật; tài liệu ghi số đo giả lập như số đo thật. & Bộ kiểm thử mới không gọi mạng thật; báo cáo này chỉ dùng số liệu tái lập được.\\\hline
+\end{longtable}}
+\nguon{Tài liệu rà soát \texttt{docs/AUDIT\_voice-calendar-agent.md} trong kho mã backend.}
+
+\section{Kiểm thử}
+\subsection{Chiến lược kiểm thử}
+Hệ thống được kiểm thử tự động ở ba mức:
+\begin{itemize}
+  \item \textbf{Đơn vị:} logic thuần của từng mô-đun (ngữ pháp thời gian, bộ trích xuất, bộ tìm mục tiêu, quy tắc thời gian của sự kiện, mật mã, giao thức WebSocket...), không cần cơ sở dữ liệu.
+  \item \textbf{Tích hợp:} gọi các tuyến HTTP/WebSocket của ứng dụng backend thật trên PostgreSQL thật. Mỗi lần chạy tạo một cơ sở dữ liệu tạm, áp dụng migration và xóa khi xong, nên các lần chạy song song không ảnh hưởng nhau.
+  \item \textbf{Đầu-cuối:} khởi động backend thật, sau đó (i) gọi mọi kênh của \ma{window.api} qua mã tiến trình chính thật và (ii) mở ứng dụng Electron thật, điều khiển giao diện qua giao thức Chrome DevTools như một người dùng. Microphone là thiết bị giả lập của Chromium phát một tệp ghi âm, nhờ đó toàn bộ chuỗi VAD → STT → agent → TTS được chạy.
+\end{itemize}
+Kiểm thử không gọi mạng thật tới Google hay Gemini. Các thành phần ngoài được thay bằng bản giả lập tuân theo cùng giao diện: cổng OAuth giả lập có kiểm tra \textit{code verifier} thật; API lịch giả lập có phân trang, lỗi 404/410/409 và lỗi theo kịch bản; mô hình ngôn ngữ giả lập trả kết quả định sẵn; đồng hồ được cố định. Mỗi mô-đun đều có ca kiểm thử cho yêu cầu thiếu xác thực (401), cô lập giữa người dùng (404), dữ liệu không hợp lệ (400) và dạng phong bì lỗi; một ca kiểm thử liên mô-đun duyệt toàn bộ đặc tả OpenAPI để bảo đảm mọi tuyến không công khai đều yêu cầu xác thực.
+
+\subsection{Kết quả kiểm thử backend}
+Bảng~\ref{tab:backend-tests} tổng hợp kết quả một lần chạy toàn bộ bộ kiểm thử của backend, chia theo phân hệ và theo mức kiểm thử.
+
+\begin{table}[!htbp]
+\caption{Kết quả kiểm thử tự động của backend theo phân hệ}\label{tab:backend-tests}
+\bang
+\begin{tabularx}{\textwidth}{|Y|C{2.2cm}|C{2.2cm}|C{1.7cm}|C{1.6cm}|}\hline
+\td{Phân hệ} & \td{Đơn vị (tệp/ca)} & \td{Tích hợp (tệp/ca)} & \td{Tổng số ca} & \td{Đạt}\\\hline
+agent (hiểu lệnh, hội thoại, xác nhận) & 15 / 916 & 3 / 52 & 968 & 968\\\hline
+auth (đăng nhập, phiên, token Google) & 4 / 74 & 6 / 76 & 150 & 150\\\hline
+calendar (Google, lịch nội bộ) & 6 / 124 & 3 / 67 & 191 & 191\\\hline
+voice (STT, TTS, âm thanh) & 6 / 164 & 2 / 28 & 192 & 192\\\hline
+realtime (WebSocket, lệnh giọng nói) & 5 / 111 & 6 / 76 & 187 & 187\\\hline
+users, health & 1 / 6 & 2 / 30 & 36 & 36\\\hline
+Lớp nền (cấu hình, thư viện, plugin, OpenAPI) & 9 / 106 & 4 / 26 & 132 & 132\\\hline
+Liên mô-đun (đầu-cuối trong backend) & – & 6 / 15 & 15 & 15\\\hline
+\td{Tổng} & \td{46 / 1.501} & \td{32 / 370} & \td{1.871} & \td{1.871}\\\hline
+\end{tabularx}
+\nguon{Kết quả chạy \texttt{npm test} ngày 22/11/2026 trên Node.js 22.23, PostgreSQL 16.15 (locale UTF-8), Linux x86-64; toàn bộ 78 tệp, 1.871 ca đều đạt.}
+\end{table}
+Phân hệ \textit{agent} chiếm hơn một nửa số ca kiểm thử, phần lớn là các bảng câu lệnh tiếng Việt và tiếng Anh kèm kết quả mong đợi cho bộ luật và ngữ pháp thời gian. Đây là bộ ca \textit{hồi quy} do nhóm soạn — nó bảo đảm các quy tắc đã thiết kế không bị phá vỡ khi sửa mã, nhưng không thay thế được việc đánh giá trên câu lệnh của người dùng thật.
+
+\subsection{Kết quả kiểm thử ứng dụng desktop}
+Ứng dụng desktop có ba bộ kiểm thử: đơn vị, đầu-cuối ở mức API và đầu-cuối trên giao diện; kết quả được trình bày ở Bảng~\ref{tab:desktop-tests}.
+
+\begin{table}[!htbp]
+\caption{Kết quả kiểm thử tự động của ứng dụng desktop}\label{tab:desktop-tests}
+\bang
+\begin{tabularx}{\textwidth}{|L{3.2cm}|Y|C{1.5cm}|C{2.6cm}|}\hline
+\td{Bộ kiểm thử} & \td{Nội dung} & \td{Số ca} & \td{Kết quả}\\\hline
+Đơn vị (\texttt{pnpm test}, 10 tệp) & Client gọi backend (làm mới token single-flight, ánh xạ lỗi), đăng nhập loopback + PKCE, các bộ xử lý IPC, đọc cấu hình; tiện ích giao diện; pipeline giọng nói (microphone, VAD, TTS, hàng đợi phát, tách câu, đo độ trễ). & 70 & 70 đạt\\\hline
+Đầu-cuối – API (\texttt{pnpm test:e2e}) & Mọi kênh \texttt{window.api} với backend thật: trạng thái chưa đăng nhập, phiên, agent, STT, TTS, vòng đời token. & 23 & 23 đạt\\\hline
+Đầu-cuối – giao diện (\texttt{pnpm test:e2e}) & Ứng dụng Electron thật: đăng nhập, lệnh gõ, xác nhận/hủy bằng nút và bằng lời, lệnh giọng nói qua microphone giả lập, phục hồi khi máy chủ đổi khóa hoặc ngừng hoạt động, xóa tài khoản từ thiết bị khác, đăng xuất. & 12 & 11 đạt, 1 bỏ qua\\\hline
+\end{tabularx}
+\nguon{Kết quả chạy ngày 22/11/2026 (Electron 39.8, màn hình ảo). Ca bị bỏ qua là “giữ phiên qua lần khởi động lại bằng tệp phiên mã hóa”: máy chạy kiểm thử không có kho khóa của hệ điều hành nên theo thiết kế phiên chỉ được giữ trong bộ nhớ.}
+\end{table}
+
+\subsection{Các kịch bản kiểm thử đầu-cuối}
+Bảng~\ref{tab:e2e-cases} tóm tắt theo chức năng các kịch bản chính của hai bộ kiểm thử đầu-cuối (35 ca) và kết quả của từng kịch bản.
+
+\FloatBarrier
+{\bang
+\begin{longtable}{|C{1.3cm}|L{9.0cm}|L{2.3cm}|C{1.5cm}|}
+\caption{Kịch bản kiểm thử đầu-cuối và kết quả}\label{tab:e2e-cases}\\\hline
+\td{Mã} & \td{Kịch bản} & \td{Bộ kiểm thử} & \td{Kết quả}\\\hline
+\endfirsthead
+\hline\td{Mã} & \td{Kịch bản} & \td{Bộ kiểm thử} & \td{Kết quả}\\\hline
+\endhead
+TC-01 & Chưa đăng nhập: ô lệnh và microphone bị khóa; các chức năng agent, giọng nói bị từ chối. & API, giao diện & Đạt\\\hline
+TC-02 & Đăng nhập Google: trình duyệt được dẫn tới Google với địa chỉ callback của backend; hủy được khi đang chờ. & API & Đạt\\\hline
+TC-03 & Đăng nhập tài khoản phát triển; khôi phục phiên đã lưu ở lần khởi tạo client kế tiếp. & API, giao diện & Đạt\\\hline
+TC-04 & Tạo sự kiện từ câu lệnh gõ theo múi giờ người dùng; trợ lý đọc câu trả lời bằng giọng của máy chủ. & API, giao diện & Đạt\\\hline
+TC-05 & Xem lịch bằng câu hỏi tự nhiên; liệt kê theo từ khóa và khoảng thời gian. & API & Đạt\\\hline
+TC-06 & Kiểm tra bận/rảnh cho khoảng có và không có sự kiện. & API & Đạt\\\hline
+TC-07 & Dời lịch: hệ thống hỏi trước; từ chối thì sự kiện giữ nguyên; trả lời “có” thì áp dụng và các nút chuyển sang trạng thái đã xử lý. & API, giao diện & Đạt\\\hline
+TC-08 & Xóa: hệ thống hỏi trước; “không” hoặc nút “Hủy” giữ sự kiện; nút “Xác nhận” xóa sự kiện. & API, giao diện & Đạt\\\hline
+TC-09 & Thao tác chờ xác nhận hết hạn thì không còn thực thi được. & API & Đạt\\\hline
+TC-10 & Lệnh thiếu thông tin được hỏi lại; lệnh ngoài phạm vi được trả lời hướng dẫn; lệnh tiếng Anh được trả lời bằng tiếng Anh. & API & Đạt\\\hline
+TC-11 & Lệnh giọng nói đầu-cuối: microphone → VAD → STT → agent → TTS. & Giao diện & Đạt\\\hline
+TC-12 & Đoạn im lặng cho bản chép rỗng; agent không chạy. & API & Đạt\\\hline
+TC-13 & Mô hình STT chính quá tải thì chuyển sang mô hình dự phòng; nhà cung cấp quá tải hoặc âm thanh hỏng được báo bằng mã lỗi. & API & Đạt\\\hline
+TC-14 & Access token hết hạn khi có nhiều yêu cầu đồng thời: chỉ làm mới một lần. & API & Đạt\\\hline
+TC-15 & Máy chủ đổi khóa ký hoặc tạm ngừng: ứng dụng báo lỗi rõ ràng, giữ phiên và tự phục hồi. & API, giao diện & Đạt\\\hline
+TC-16 & Tài khoản bị xóa từ thiết bị khác: ứng dụng trở về màn hình đăng nhập. & API, giao diện & Đạt\\\hline
+TC-17 & Đăng xuất thu hồi refresh token ở máy chủ; đăng nhập lại được. & API, giao diện & Đạt\\\hline
+TC-18 & Giữ phiên qua lần khởi động lại ứng dụng bằng tệp phiên mã hóa. & Giao diện & Bỏ qua\\\hline
+\end{longtable}}
+\nguon{Các bộ kiểm thử \texttt{test/e2e/api.e2e.ts} và \texttt{test/e2e/gui.e2e.ts} của ứng dụng desktop; TC-11 đến TC-13 dùng dịch vụ Gemini giả lập; TC-18 bị bỏ qua vì lý do nêu ở Bảng~\ref{tab:desktop-tests}.}
+
+\section{Đánh giá}
+\subsection{Mức độ đáp ứng yêu cầu chức năng}
+Bảng~\ref{tab:fr-status} đối chiếu từng yêu cầu chức năng ở Bảng~\ref{tab:functional-requirements} với căn cứ kiểm chứng tương ứng.
+
+\FloatBarrier
+{\bang
+\begin{longtable}{|C{1.4cm}|C{2.5cm}|L{10.77cm}|}
+\caption{Mức độ đáp ứng các yêu cầu chức năng}\label{tab:fr-status}\\\hline
+\td{Mã} & \td{Mức độ} & \td{Căn cứ và ghi chú}\\\hline
+\endfirsthead
+\hline\td{Mã} & \td{Mức độ} & \td{Căn cứ và ghi chú}\\\hline
+\endhead
+FR-01 & Đạt & Luồng đăng nhập được kiểm thử tích hợp với cổng OAuth giả lập có kiểm tra PKCE; phía ứng dụng có TC-02, TC-03. Đăng nhập với tài khoản Google thật cần cấu hình client OAuth và danh sách người dùng thử.\\\hline
+FR-02 & Đạt & Kiểm thử liên mô-đun về xóa tài khoản (xóa dây chuyền mọi dữ liệu); TC-16.\\\hline
+FR-03 & Đạt & Giao diện hiển thị trạng thái microphone; dừng nghe giải phóng thiết bị (kiểm thử đơn vị pipeline giọng nói).\\\hline
+FR-04 & Đạt & VAD chạy thật trong TC-11; STT qua Gemini được kiểm thử với dịch vụ giả lập. Chất lượng nhận dạng tiếng Việt chưa được đo định lượng.\\\hline
+FR-05 & Đạt & TC-04; các câu lệnh mẫu trên giao diện.\\\hline
+FR-06 & Đạt & TC-05; Bảng~\ref{tab:dialog}.\\\hline
+FR-07 & Đạt & TC-04, TC-10; Bảng~\ref{tab:dialog} (câu 1, 2, 9).\\\hline
+FR-08 & Đạt & TC-07; kiểm thử đơn vị bộ tìm mục tiêu và kế hoạch cập nhật.\\\hline
+FR-09 & Đạt & TC-08.\\\hline
+FR-10 & Đạt & TC-06; Bảng~\ref{tab:dialog} (câu 8).\\\hline
+FR-11 & Đạt & TC-07, TC-08, TC-09; kiểm thử đơn vị về xác nhận đồng thời.\\\hline
+FR-12 & Đạt & Kiểm thử phân hệ lịch với lỗi theo kịch bản; TC-15.\\\hline
+FR-13 & Đạt & TC-04, TC-11; chưa hỗ trợ ngắt lời trợ lý bằng giọng nói.\\\hline
+FR-14 & Đạt một phần & Backend lưu và cung cấp API xem, xóa lịch sử; giao diện desktop chưa có màn hình lịch sử.\\\hline
+FR-15 & Đạt một phần & API cài đặt đầy đủ; giọng đọc được lưu theo người dùng; giao diện chưa có màn hình cài đặt.\\\hline
+FR-16 & Chưa thực hiện & Thuộc kế hoạch giai đoạn cuối.\\\hline
+\end{longtable}}
+\nguon{Nhóm đánh giá dựa trên kết quả kiểm thử.}
+
+\subsection{Về độ trễ}
+Ứng dụng đã ghi nhận thời gian từng giai đoạn cho mỗi lượt lệnh (Hình~\ref{fig:voice}), và backend trả về độ trễ STT trong mỗi kết quả nhận dạng. Tuy nhiên, nhóm \textit{chưa} thực hiện phép đo có hệ thống với dịch vụ thật (Gemini, Piper, Google Calendar): các con số thu được trong cấu hình kiểm thử chỉ phản ánh chi phí của phần mềm nhóm viết, không bao gồm thời gian suy luận của mô hình và độ trễ mạng. Về mặt cấu trúc, độ trễ của một lượt lệnh giọng nói hiện gồm: 400 ms chờ xác định kết thúc câu; một lời gọi STT; một lời gọi agent (có thể gồm một lời gọi LLM, bị giới hạn 8 giây trước khi chuyển sang bộ luật, và một hoặc vài lời gọi dịch vụ lịch); một lời gọi tổng hợp cho câu đầu tiên. Phép đo p50/p95 trên tập câu lệnh ghi âm thật là việc của giai đoạn cuối (mục~\ref{sec:progress}).
+
+\subsection{Ưu điểm}
+\begin{itemize}
+  \item \textbf{An toàn thao tác ghi:} sửa/xóa luôn qua xác nhận có thời hạn và chỉ thực thi một lần; hệ thống hỏi lại thay vì đoán khi thiếu hoặc mơ hồ thông tin.
+  \item \textbf{Không để bí mật ở phía người dùng:} ứng dụng không chứa khóa API hay token Google; token phiên chỉ nằm ở tiến trình chính và chỉ ghi đĩa khi mã hóa được.
+  \item \textbf{Hiểu lệnh có dự phòng:} khi dịch vụ LLM lỗi hoặc hết hạn mức, bộ luật tiếng Việt/tiếng Anh vẫn xử lý được các lệnh lịch thông dụng một cách tất định.
+  \item \textbf{Dễ thay thế và kiểm thử:} mọi dịch vụ ngoài nằm sau giao diện; 1.871 ca kiểm thử backend và các bộ kiểm thử đầu-cuối chạy được mà không cần tài khoản hay khóa thật.
+  \item \textbf{Sẵn sàng cho nhiều loại client:} API được mô tả bằng OpenAPI; kênh WebSocket hỗ trợ truyền trạng thái và âm thanh theo từng câu.
+\end{itemize}
+
+\subsection{Hạn chế}\label{sec:limits}
+\begin{itemize}
+  \item Chưa có từ khóa đánh thức và chế độ chạy nền thường trú (khay hệ thống, phím tắt toàn cục, khởi động cùng hệ điều hành); ứng dụng hiện là một cửa sổ, kích hoạt nghe bằng nút bấm.
+  \item STT phụ thuộc dịch vụ Gemini (cần mạng, chịu hạn mức), nhận cả đoạn ghi âm một lần; chưa có STT ngoại tuyến; chưa đo WER trên tiếng Việt.
+  \item Ứng dụng desktop chưa dùng kênh WebSocket; mỗi lượt lệnh giọng nói gồm ba chặng REST tuần tự. Chưa hỗ trợ ngắt lời trợ lý bằng giọng nói.
+  \item Chưa có số đo độ trễ và độ chính xác hiểu lệnh trên dữ liệu người dùng thật.
+  \item Hội thoại mới có ngữ cảnh ngắn hạn (thao tác chờ, lịch sử lưu trữ); chưa có bộ nhớ dài hạn và tóm tắt ngữ cảnh.
+  \item Lịch: chỉ lịch chính của tài khoản Google; chưa hỗ trợ người tham dự, nhắc nhở, tạo sự kiện lặp.
+  \item Tăng cường bảo mật phía ứng dụng chưa hoàn tất: tiến trình giao diện chưa bật sandbox và preload còn công bố đối tượng tiện ích mặc định của bộ công cụ dựng.
+  \item Backend mới chạy một tiến trình: bộ đếm giới hạn tần suất và trạng thái kênh WebSocket nằm trong bộ nhớ; đăng xuất chỉ thu hồi refresh token, access token đã cấp còn hiệu lực đến khi hết hạn (tối đa 15 phút).
+  \item Ứng dụng Google ở trạng thái thử nghiệm chỉ cho phép các tài khoản trong danh sách người dùng thử và cấp refresh token có hạn ngắn; phát hành rộng cần qua quy trình xác minh của Google.
+  \item Lưu ý triển khai: tìm kiếm không phân biệt hoa thường của lịch nội bộ dựa vào cơ sở dữ liệu, nên PostgreSQL phải được khởi tạo với locale UTF-8; với locale \texttt{C}, một ca kiểm thử tìm kiếm chữ có dấu không đạt.
+\end{itemize}
+
+\section{Tiến độ so với kế hoạch}\label{sec:progress}
+Báo cáo định kỳ lần 1 đề ra sáu giai đoạn công việc. Bảng~\ref{tab:progress} đối chiếu tình hình thực hiện.
+
+\FloatBarrier
+{\bang
+\begin{longtable}{|L{3.6cm}|L{2.5cm}|L{8.55cm}|}
+\caption{Đối chiếu tiến độ với kế hoạch ở báo cáo định kỳ lần 1}\label{tab:progress}\\\hline
+\td{Giai đoạn theo kế hoạch} & \td{Tình trạng} & \td{Ghi chú}\\\hline
+\endfirsthead
+\hline\td{Giai đoạn theo kế hoạch} & \td{Tình trạng} & \td{Ghi chú}\\\hline
+\endhead
+1. Khảo sát và thiết kế & Hoàn thành & Thiết kế được cập nhật theo kiến trúc client mỏng – backend.\\\hline
+2. Nguyên mẫu âm thanh & Hoàn thành, trừ từ khóa đánh thức & Microphone, Silero VAD, cắt câu, chống thu lại tiếng loa.\\\hline
+3. Nguyên mẫu hiểu lệnh & Hoàn thành & Bộ luật tiếng Việt/tiếng Anh và Gemini; bảng câu lệnh có đáp án trong bộ kiểm thử. Chưa có tập ghi âm tiếng Việt gán nhãn để đo STT.\\\hline
+4. Tích hợp Calendar & Hoàn thành & OAuth 2.0 + PKCE, lưu token mã hóa, đủ năm nhóm thao tác; mở rộng thành backend nhiều người dùng.\\\hline
+5. Hội thoại và phản hồi & Hoàn thành & Xác nhận, hủy, xử lý lỗi, trạng thái giao diện, TTS theo câu.\\\hline
+6. Đánh giá và hoàn thiện & Đang thực hiện & Kiểm thử tự động đã xong; chưa đo chất lượng STT và độ trễ với dịch vụ thật.\\\hline
+\end{longtable}}
+\nguon{Nhóm tổng hợp.}
+
+So với dự kiến ban đầu, có hai thay đổi lớn: (i) phần xử lý đặc quyền được tách thành backend riêng thay vì nằm trong ứng dụng desktop; (ii) các lựa chọn công nghệ để ngỏ ở báo cáo lần 1 đã được chốt (Bảng~\ref{tab:tech-summary}). Kế hoạch cho giai đoạn còn lại:
+\begin{enumerate}
+  \item Hiện thực từ khóa đánh thức và chế độ chạy nền (khay hệ thống, một phiên bản duy nhất, khởi động cùng hệ điều hành) để đáp ứng đầy đủ yêu cầu “chạy thường trú”.
+  \item Chuyển ứng dụng desktop sang kênh WebSocket; cho phép dừng trợ lý bằng giọng nói.
+  \item Xây dựng tập câu lệnh tiếng Việt ghi âm thật có đáp án; đo WER, tỷ lệ đúng ý định/thời gian và độ trễ p50/p95 với dịch vụ thật trên máy mục tiêu.
+  \item Bổ sung bộ nhớ hội thoại (tóm tắt ngữ cảnh) và màn hình lịch sử, cài đặt trên giao diện.
+  \item Hoàn tất tăng cường bảo mật phía ứng dụng (sandbox, thu gọn preload) và đóng gói bản cài đặt.
+  \item Hoàn thiện quyển đồ án và bản tóm tắt.
+\end{enumerate}
+
+\section{Kết luận chương}
+Chương 4 đã trình bày việc triển khai backend và ứng dụng desktop, minh họa các chức năng bằng ảnh chụp và chuỗi hội thoại thực tế, và báo cáo kết quả kiểm thử tự động: 1.871 ca kiểm thử của backend và 104 ca trong số 105 ca của ứng dụng desktop đạt, một ca bị bỏ qua do môi trường chạy. Các yêu cầu chức năng cốt lõi về thao tác lịch an toàn bằng giọng nói và văn bản đã được đáp ứng; phần còn lại tập trung vào chế độ thường trú, đo đạc với dịch vụ thật và hoàn thiện trải nghiệm.

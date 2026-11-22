@@ -1,0 +1,114 @@
+\phuluc
+
+\mucphuluc{Phụ lục A. Danh sách API HTTP của backend}
+Bảng~\ref{tab:api} liệt kê các thao tác HTTP của backend và điểm nâng cấp WebSocket. Mọi đường dẫn (trừ \ma{/health} và \ma{/ready}) nằm dưới tiền tố \ma{/api/v1}. Cột “XT” đánh dấu các tuyến yêu cầu tiêu đề \texttt{Authorization: Bearer <access token>}.
+
+{\bang
+\begin{longtable}{|C{1.75cm}|L{5.3cm}|C{0.8cm}|L{6.38cm}|}
+\caption{Các thao tác HTTP của backend}\label{tab:api}\\\hline
+\td{PT} & \td{Đường dẫn} & \td{XT} & \td{Mô tả}\\\hline
+\endfirsthead
+\hline\td{PT} & \td{Đường dẫn} & \td{XT} & \td{Mô tả}\\\hline
+\endhead
+GET & \ma{/health} &  & Kiểm tra dịch vụ còn sống.\\\hline
+GET & \ma{/ready} &  & Kiểm tra sẵn sàng (truy vấn thử cơ sở dữ liệu).\\\hline
+GET & \ma{/auth/google/login} &  & Bắt đầu đăng nhập Google; trả 302 tới Google.\\\hline
+GET & \ma{/auth/google/callback} &  & Đích chuyển hướng của Google; trả 302 về ứng dụng.\\\hline
+POST & \ma{/auth/token} &  & Đổi mã đăng nhập hoặc refresh token lấy cặp token mới.\\\hline
+POST & \ma{/auth/dev-login} &  & Đăng nhập phát triển (chỉ khi được bật).\\\hline
+POST & \ma{/auth/logout} &  & Thu hồi chuỗi phiên của refresh token.\\\hline
+GET & \ma{/auth/status} & x & Trạng thái đăng nhập, quyền Google, nguồn lịch.\\\hline
+POST & \ma{/auth/google/disconnect} & x & Thu hồi và xóa thông tin Google; chuyển về lịch nội bộ.\\\hline
+GET & \ma{/me} & x & Hồ sơ và cài đặt.\\\hline
+PATCH & \ma{/me/settings} & x & Cập nhật múi giờ, ngôn ngữ, giọng đọc, yêu cầu xác nhận.\\\hline
+DELETE & \ma{/me} & x & Xóa tài khoản và toàn bộ dữ liệu.\\\hline
+GET & \ma{/calendar/status} & x & Nguồn lịch, trạng thái kết nối, múi giờ.\\\hline
+GET & \ma{/calendar/events} & x & Liệt kê, tìm sự kiện theo khoảng thời gian và từ khóa.\\\hline
+POST & \ma{/calendar/events} & x & Tạo sự kiện.\\\hline
+GET & \ma{/calendar/events/:id} & x & Đọc một sự kiện.\\\hline
+PATCH & \ma{/calendar/events/:id} & x & Cập nhật một phần sự kiện.\\\hline
+DELETE & \ma{/calendar/events/:id} & x & Xóa sự kiện.\\\hline
+GET & \ma{/calendar/freebusy} & x & Các khoảng bận trong một khoảng thời gian (tối đa 62 ngày).\\\hline
+POST & \ma{/agent/command} & x & Gửi câu lệnh ngôn ngữ tự nhiên cho agent.\\\hline
+POST & \ma{/agent/actions/:id/confirm} & x & Xác nhận thao tác đang chờ.\\\hline
+POST & \ma{/agent/actions/:id/reject} & x & Hủy thao tác đang chờ.\\\hline
+GET & \ma{/conversations} & x & Danh sách hội thoại (phân trang con trỏ).\\\hline
+GET & \ma{/conversations/:id/messages} & x & Tin nhắn của một hội thoại.\\\hline
+DELETE & \ma{/conversations/:id} & x & Xóa hội thoại.\\\hline
+POST & \ma{/voice/transcribe} & x & Nhận dạng một đoạn âm thanh (JSON base64 hoặc multipart).\\\hline
+POST & \ma{/voice/command} & x & Âm thanh → văn bản → agent → giọng đọc trong một yêu cầu.\\\hline
+GET & \ma{/voice/stt/status} & x & Bộ STT đang dùng và tính khả dụng.\\\hline
+POST & \ma{/tts/synthesize} & x & Tổng hợp giọng đọc (WAV hoặc base64).\\\hline
+GET & \ma{/tts/voices} & x & Danh sách giọng đọc.\\\hline
+GET & \ma{/tts/status} & x & Trạng thái bộ TTS.\\\hline
+GET & \ma{/ws} & (*) & Nâng cấp lên WebSocket; (*) xác thực bằng tiêu đề hoặc khung \texttt{auth} đầu tiên.\\\hline
+\end{longtable}}
+\nguon{Đặc tả \texttt{docs/openapi.json} của backend (31 thao tác HTTP) và mô-đun realtime.}
+
+\mucphuluc{Phụ lục B. Các biến cấu hình chính}
+Bảng~\ref{tab:env} liệt kê các biến môi trường chính cùng giá trị mặc định; các biến không có mặc định và không bắt buộc sẽ tắt chức năng tương ứng khi bỏ trống.
+
+{\bang
+\begin{longtable}{|L{5.3cm}|L{3.5cm}|L{5.85cm}|}
+\caption{Biến môi trường chính của backend và ứng dụng desktop}\label{tab:env}\\\hline
+\td{Biến} & \td{Mặc định} & \td{Ý nghĩa}\\\hline
+\endfirsthead
+\hline\td{Biến} & \td{Mặc định} & \td{Ý nghĩa}\\\hline
+\endhead
+\ma{DATABASE_URL} & bắt buộc & Chuỗi kết nối PostgreSQL.\\\hline
+\ma{JWT_SECRET} & bắt buộc & Bí mật ký access token (ít nhất 32 ký tự).\\\hline
+\ma{TOKEN_ENCRYPTION_KEY} & bắt buộc & Khóa AES-256-GCM (32 byte, base64).\\\hline
+\ma{PUBLIC_BASE_URL} & \ma{http://localhost:4000} & Địa chỉ công khai; dùng để suy ra địa chỉ callback của Google.\\\hline
+\ma{GOOGLE_CLIENT_ID}, \ma{GOOGLE_CLIENT_SECRET} & không có & Client OAuth của Google; thiếu thì chỉ dùng lịch nội bộ.\\\hline
+\ma{GEMINI_API_KEY}, \ma{GEMINI_MODEL} & không có; \ma{gemini-3.8-flash} & Bật STT Gemini và trích xuất ý định bằng LLM.\\\hline
+\ma{INTENT_EXTRACTOR} & \ma{hybrid} & \ma{hybrid}, \ma{rule} hoặc \ma{llm}.\\\hline
+\ma{LLM_TIMEOUT_MS}, \ma{STT_TIMEOUT_MS} & 8000; 30000 & Giới hạn thời gian gọi LLM và STT.\\\hline
+\ma{STT_PROVIDER}, \ma{TTS_PROVIDER} & theo cấu hình & \ma{gemini}/\ma{mock}/\ma{none}; \ma{piper}/\ma{mock}/\ma{none}.\\\hline
+\ma{PIPER_BINARY_PATH}, \ma{PIPER_MODELS_DIR}, \ma{PIPER_DEFAULT_VOICE} & không có; \ma{./models/piper}; không có & Vị trí Piper, thư mục mô hình giọng và giọng mặc định.\\\hline
+\ma{TTS_MAX_CONCURRENCY}, \ma{TTS_TIMEOUT_MS}, \ma{TTS_MAX_CHARS} & 2; 15000; 1000 & Giới hạn tổng hợp tiếng nói.\\\hline
+\ma{MAX_AUDIO_BYTES} & 10 MB & Kích thước âm thanh tối đa sau giải mã.\\\hline
+\ma{ACCESS_TOKEN_TTL_SECONDS}, \ma{REFRESH_TOKEN_TTL_DAYS} & 900; 30 & Thời hạn token phiên.\\\hline
+\ma{PENDING_ACTION_TTL_SECONDS} & 300 & Thời hạn của thao tác chờ xác nhận.\\\hline
+\ma{RATE_LIMIT_MAX}, \ma{RATE_LIMIT_WINDOW_MS} & 120; 60000 & Giới hạn tần suất toàn cục.\\\hline
+\ma{DEFAULT_TIMEZONE} & \ma{Asia/Bangkok} & Múi giờ khi yêu cầu và người dùng không chỉ định.\\\hline
+\ma{AUTH_DEV_LOGIN_ENABLED} & \ma{false} & Bật đăng nhập phát triển (bị từ chối ở production).\\\hline
+\ma{VOICE_BACKEND_URL} (desktop) & \ma{http://localhost:4000} & Địa chỉ backend mà ứng dụng kết nối.\\\hline
+\end{longtable}}
+\nguon{Tệp \texttt{src/config/env.ts} của backend và \texttt{.env.example} của hai kho mã.}
+
+\mucphuluc{Phụ lục C. Ví dụ phản hồi của agent cho một lệnh xóa}
+Phản hồi của \texttt{POST /api/v1/agent/command} với câu lệnh “Xóa cuộc họp nhóm chiều mai” khi yêu cầu xác nhận đang bật (đã lược bớt):
+\begin{code}
+{
+  "success": true,
+  "intent": "DELETE_EVENT",
+  "language": "vi",
+  "message": "Bạn có chắc muốn xóa lịch \"Họp nhóm\" (...)?
+              Trả lời \"có\" để xác nhận hoặc \"không\" để hủy.",
+  "events": [ { "id": "...", "summary": "Họp nhóm",
+                "start": { "dateTime": "...", "timeZone": "Asia/Bangkok" } } ],
+  "requiresConfirmation": true,
+  "pendingAction": {
+    "id": "7b0c...", "type": "DELETE_EVENT", "status": "pending",
+    "eventId": "...", "eventSummary": "Họp nhóm",
+    "expiresAt": "2026-11-05T08:05:00.000Z"
+  },
+  "conversationId": "3f2a...", "messageId": "a91d..."
+}
+\end{code}
+
+\mucphuluc{Phụ lục D. Lệnh chạy kiểm thử để tái lập số liệu}
+Các số liệu kiểm thử ở Chương~\ref{ch:impl} được tái lập bằng các lệnh sau (cần Node.js từ 22.12, pnpm và PostgreSQL 16 hoặc Docker):
+\begin{code}
+# Backend (thư mục voice-backend)
+npm ci
+npm run db:test:up          # PostgreSQL kiểm thử (Docker, cổng 55433; không bắt buộc)
+npm test                    # kiểm thử đơn vị + tích hợp
+npm run lint && npm run typecheck
+
+# Ứng dụng desktop (thư mục voice-calendar-agent)
+pnpm install
+pnpm test                   # kiểm thử đơn vị
+pnpm test:e2e               # đầu-cuối với backend thật (bộ giao diện cần màn hình)
+pnpm ui:shots thu-muc-anh   # chụp giao diện ở các trạng thái chính
+\end{code}

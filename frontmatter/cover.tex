@@ -4,6 +4,14 @@
     {\includegraphics[height=3.2cm]{figures/logo-ptit.png}}
     {\fbox{\parbox[c][2.8cm][c]{2.8cm}{\centering\small LOGO\\PTIT}}}}
 
+% Dòng "BÁO CÁO ĐỊNH KỲ ..." (chỉ in khi \DotBaoCao trong config/info.tex khác rỗng)
+\newcommand{\DongDotBaoCao}{%
+  \if\relax\detokenize\expandafter{\DotBaoCao}\relax
+    \vspace{1.2cm}%
+  \else
+    \vspace{0.55cm}{\bfseries\fontsize{16}{20}\selectfont\DotBaoCao\par}\vspace{0.45cm}%
+  \fi}
+
 % Nội dung bìa dùng chung cho bìa ngoài và bìa phụ (#1: bề rộng)
 \newcommand{\CoverBody}[1]{%
   \begin{minipage}{#1}\centering
@@ -11,7 +19,7 @@
      BỘ KHOA HỌC VÀ CÔNG NGHỆ\\
      HỌC VIỆN CÔNG NGHỆ BƯU CHÍNH VIỄN THÔNG\\
      ------------------------------\par}
-    \par\vspace{1cm}\LogoPTIT\par\vspace{1.2cm}
+    \par\vspace{1cm}\LogoPTIT\par\DongDotBaoCao
     {\bfseries\fontsize{36}{42}\selectfont ĐỒ ÁN\\TỐT NGHIỆP ĐẠI HỌC\par}
     \vspace{1.3cm}
     {\bfseries\itshape\fontsize{16}{20}\selectfont % 16-30 pt tùy độ dài tên đề tài
@@ -39,7 +47,7 @@
     ([xshift=2.15cm,yshift=-3.6cm]current page.north west)
     {\parbox{19.5cm}{\small\GayBia\hfill CHUYÊN NGÀNH: CÔNG NGHỆ PHẦN MỀM\hfill \KhoaHoc}};
   \node[anchor=center,align=center] at
-    ([xshift=2.15cm,yshift=4cm]current page.south west) {\small TP.\\HCM\\2026};
+    ([xshift=2.15cm,yshift=4cm]current page.south west) {\small TP.\\HCM\\\NamBaoCao};
   \node[anchor=north,inner sep=0pt] at
     ([xshift=11.7cm,yshift=-3.9cm]current page.north west) {\CoverBody{14.5cm}};
   \node[anchor=center] at ([xshift=11.7cm,yshift=2.3cm]current page.south west)

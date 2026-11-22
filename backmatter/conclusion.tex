@@ -1,10 +1,19 @@
 \unnumchapter{KẾT LUẬN, KIẾN NGHỊ}
+\newcommand{\mucketluan}[1]{\par\vspace{4pt}{\bfseries #1}\par\nopagebreak}
 
-\textbf{Kết quả của báo cáo định kỳ lần 1.}
-Báo cáo đã xác định bài toán trợ lý desktop hỗ trợ quản lý Google Calendar bằng tiếng Việt, làm rõ phạm vi nguyên mẫu, trình bày kiến thức nền về xử lý tiếng nói, hiểu lệnh, suy luận thời gian, OAuth và Calendar API, đồng thời đề xuất yêu cầu, quy trình nghiệp vụ và kiến trúc mô-đun ban đầu. Đây là kết quả phân tích và thiết kế; báo cáo chưa khẳng định các mô-đun đã được triển khai hoặc có số liệu thực nghiệm.
+\mucketluan{1. Kết quả đạt được}
+Đến báo cáo định kỳ lần 2, đề tài đã chuyển từ giai đoạn phân tích – thiết kế sang một hệ thống chạy được và có kiểm chứng:
+\begin{itemize}
+  \item \textbf{Về lý thuyết:} đã tìm hiểu và hệ thống hóa các khâu của trợ lý giọng nói (VAD, từ khóa đánh thức, STT, hiểu ý định và trích xuất thực thể, suy luận ngày giờ, quản lý hội thoại, TTS), các chuẩn OAuth 2.0/PKCE/JWT, Google Calendar API, các cơ chế truyền dữ liệu thời gian thực và phương pháp đo độ trễ.
+  \item \textbf{Ứng dụng desktop} (Electron, React): thu âm, phát hiện tiếng nói bằng Silero VAD ngay trên máy, giao diện hội thoại có thẻ sự kiện và nút xác nhận, phát giọng đọc theo từng câu, đo độ trễ từng giai đoạn; phiên đăng nhập được giữ ở tiến trình chính và mã hóa bằng kho khóa của hệ điều hành.
+  \item \textbf{Backend nhiều người dùng} (Fastify, PostgreSQL): đăng nhập Google theo OAuth 2.0 với PKCE ở hai chặng; lịch Google và lịch nội bộ sau cùng một giao diện; agent hiểu lệnh tiếng Việt/tiếng Anh theo chế độ lai (Gemini kết hợp bộ luật và ngữ pháp thời gian tự xây dựng); cơ chế hỏi lại và xác nhận trước khi sửa/xóa; STT bằng Gemini, TTS bằng Piper; kênh WebSocket truyền trạng thái và âm thanh theo từng câu; 31 thao tác HTTP được mô tả bằng OpenAPI.
+  \item \textbf{Chất lượng phần mềm:} rà soát nguyên mẫu ban đầu phát hiện 77 lỗi và đã được giải quyết bằng việc tái kiến trúc; bộ kiểm thử tự động gồm 1.871 ca của backend (đều đạt) và 105 ca của ứng dụng desktop (104 đạt, 1 bỏ qua do môi trường), bao gồm kiểm thử đầu-cuối trên ứng dụng Electron thật.
+\end{itemize}
 
-\textbf{Giới hạn.}
-Các lựa chọn về VAD, wake word, STT, TTS và công nghệ desktop vẫn cần được kiểm chứng trên môi trường mục tiêu. Chưa có tập dữ liệu tiếng Việt có gán nhãn để đánh giá; quy tắc cho câu lệnh mơ hồ, mặc định thời lượng và thao tác với sự kiện lặp cũng cần được thống nhất. Kết quả nhận dạng và độ trễ thực tế chưa được đo trong giai đoạn này.
+\mucketluan{2. Hạn chế}
+Sản phẩm chưa có từ khóa đánh thức và chế độ chạy nền thường trú; nhận dạng tiếng nói phụ thuộc dịch vụ đám mây và chưa được đánh giá định lượng trên tiếng Việt; chưa có số đo độ trễ với dịch vụ thật; ứng dụng desktop chưa dùng kênh WebSocket; hội thoại chưa có bộ nhớ dài hạn; nghiệp vụ lịch chưa bao gồm người tham dự, nhắc nhở và sự kiện lặp. Các hạn chế được liệt kê chi tiết ở mục~\ref{sec:limits}.
 
-\textbf{Kiến nghị và hướng tiếp theo.}
-Giai đoạn kế tiếp nên ưu tiên nguyên mẫu microphone--VAD--STT và bộ ca kiểm thử tiếng Việt; sau đó hiện thực phân tích ý định, chuẩn hóa thời gian và OAuth trên lịch thử nghiệm riêng. Chỉ thêm chức năng ghi/sửa/xóa sau khi đã có cơ chế xác nhận và kiểm thử lỗi. Các chỉ tiêu hiệu năng cần được chốt cùng giảng viên hướng dẫn sau khi đo đường cơ sở, đồng thời rà soát bảng phân công và thông tin bìa theo tình hình thực tế.
+\mucketluan{3. Hướng phát triển và kiến nghị}
+Trong giai đoạn còn lại, nhóm ưu tiên: (i) hiện thực từ khóa đánh thức và chế độ chạy nền để đáp ứng đầy đủ yêu cầu “chạy thường trú”; (ii) chuyển ứng dụng sang kênh WebSocket và cho phép ngắt lời trợ lý; (iii) xây dựng tập câu lệnh tiếng Việt ghi âm thật để đo WER, tỷ lệ hiểu đúng và độ trễ p50/p95 với dịch vụ thật; (iv) bổ sung bộ nhớ hội thoại và các màn hình lịch sử, cài đặt; (v) hoàn tất tăng cường bảo mật phía ứng dụng và đóng gói bản cài đặt. Về lâu dài, có thể bổ sung STT chạy cục bộ (Whisper/PhoWhisper) sau giao diện sẵn có và mở rộng nghiệp vụ lịch (nhiều lịch, người tham dự, sự kiện lặp).
+
+Nhóm kính mong giảng viên hướng dẫn góp ý về thứ tự ưu tiên của các hạng mục trên và về tiêu chí đánh giá (tập câu lệnh, ngưỡng độ trễ chấp nhận được).

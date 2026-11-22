@@ -1,117 +1,606 @@
-\chapter{PHÂN TÍCH VÀ THIẾT KẾ HỆ THỐNG}
+\chuong{PHÂN TÍCH VÀ THIẾT KẾ HỆ THỐNG}{Phân tích và thiết kế hệ thống}
 \label{ch:design}
 
-\section{Các tác nhân và ranh giới hệ thống}
-Tác nhân chính là người dùng desktop. Ứng dụng nhận âm thanh từ microphone, trình duyệt hệ thống thực hiện đăng nhập OAuth, còn Google Calendar API cung cấp dữ liệu lịch ở phía ngoài. Các mô hình nhận dạng và tổng hợp tiếng nói có thể chạy cục bộ hoặc được cung cấp qua dịch vụ; việc lựa chọn mỗi mô-đun không làm thay đổi quy tắc nghiệp vụ quản lý sự kiện.
+Chương này trình bày yêu cầu của hệ thống, kiến trúc tổng thể theo mô hình client mỏng – backend và thiết kế chi tiết của từng phân hệ. Toàn bộ nội dung mô tả thiết kế \textit{đã được hiện thực} trong mã nguồn; những phần chưa hiện thực được ghi chú rõ.
 
-Hệ thống chịu trách nhiệm diễn giải lệnh, phát hiện dữ liệu thiếu, yêu cầu xác nhận khi cần, gọi đúng thao tác API và thông báo kết quả. Hệ thống không chịu trách nhiệm quyết định thay người dùng khi câu lệnh mơ hồ, không lưu mật khẩu Google, không âm thầm bỏ qua lỗi quyền truy cập và không khẳng định sự kiện đã thay đổi nếu API chưa xác nhận thành công.
+\section{Phân tích yêu cầu}
+\subsection{Tác nhân và ca sử dụng}
+Tác nhân chính là \textit{người dùng} của ứng dụng desktop. Các hệ thống ngoài gồm Google (dịch vụ OAuth và Google Calendar) và Gemini API (nhận dạng tiếng nói, trích xuất ý định). Sơ đồ~\ref{dia:usecase} trình bày các ca sử dụng. Hai ca “ra lệnh bằng giọng nói” và “nhập lệnh văn bản” đều dẫn tới cùng nhóm thao tác lịch thông qua agent hiểu lệnh; thao tác sửa/xóa luôn đi qua ca “xác nhận hoặc hủy thao tác”.
 
-\section{Yêu cầu hệ thống}
-\subsection{Yêu cầu chức năng}
-\begin{longtable}{|>{\raggedright\arraybackslash}p{1.5cm}|>{\raggedright\arraybackslash}p{12.8cm}|}
-\caption{Yêu cầu chức năng ban đầu}\label{tab:functional-requirements}\\\hline
-\textbf{Mã} & \textbf{Mô tả yêu cầu}\\\hline
-\endfirsthead
-\hline\textbf{Mã} & \textbf{Mô tả yêu cầu}\\\hline
-\endhead
-FR-01 & Người dùng có thể bật/tắt chế độ nghe và biết rõ trạng thái microphone; ứng dụng không thu âm khi chế độ nghe đã tắt.\\\hline
-FR-02 & Ứng dụng nhận lệnh tiếng Việt, hiển thị bản chép và cho phép người dùng sửa hoặc hủy trước khi thao tác với lịch.\\\hline
-FR-03 & Người dùng có thể yêu cầu xem lịch trong một khoảng thời gian và nhận danh sách sự kiện có thời gian bắt đầu/kết thúc.\\\hline
-FR-04 & Người dùng có thể yêu cầu tạo sự kiện; ứng dụng kiểm tra tiêu đề và thời gian, làm rõ trường bắt buộc còn thiếu, rồi trình bày nội dung trước khi ghi nếu lệnh chưa đủ chắc chắn.\\\hline
-FR-05 & Người dùng có thể tìm và chọn đúng sự kiện cần cập nhật hoặc xóa; trước khi xóa phải nêu sự kiện mục tiêu và yêu cầu xác nhận.\\\hline
-FR-06 & Ứng dụng hỗ trợ OAuth 2.0 để kết nối tài khoản Google, hiển thị trạng thái kết nối và cho phép ngắt kết nối.\\\hline
-FR-07 & Ứng dụng thông báo kết quả thành công chỉ sau khi nhận phản hồi thành công từ API; nếu thất bại, hiển thị nguyên nhân phù hợp và bước tiếp theo.\\\hline
-FR-08 & Khi dữ liệu câu lệnh mơ hồ hoặc mức tin cậy thấp, ứng dụng hỏi lại thay vì tự tạo, sửa hoặc xóa sự kiện.\\\hline
-\end{longtable}
-
-\subsection{Yêu cầu phi chức năng}
-\begin{itemize}
-  \item \textbf{Bảo mật:} ưu tiên OAuth Authorization Code với PKCE; giới hạn scope, bảo vệ token bằng kho lưu trữ an toàn của hệ điều hành, không đưa token vào log hoặc renderer.
-  \item \textbf{Quyền riêng tư:} thông báo trạng thái microphone, cho phép tắt nghe, hạn chế lưu bản ghi âm và chỉ gửi âm thanh tới dịch vụ ngoài khi đã chọn phương án đám mây.
-  \item \textbf{Độ tin cậy:} thao tác ghi lịch phải có kiểm tra dữ liệu, xử lý timeout/mất mạng, chống gửi lặp khi có thể và xác minh kết quả sau khi gọi API.
-  \item \textbf{Khả năng bảo trì:} tách nghiệp vụ lịch khỏi nhà cung cấp STT/TTS; mỗi mô-đun có giao diện đầu vào/đầu ra và có thể kiểm thử độc lập.
-  \item \textbf{Khả năng sử dụng:} trạng thái nghe, nhận dạng, chờ xác nhận, đang thực hiện và lỗi phải phân biệt được; phản hồi cần ngắn gọn và nêu rõ hành động sẽ thực hiện.
-  \item \textbf{Hiệu năng:} đo thời gian theo từng giai đoạn và báo cáo p50/p95 trên cấu hình thử nghiệm xác định. Ngưỡng chấp nhận được thống nhất sau khi đo nguyên mẫu, không giả định trước khi có số liệu.
-\end{itemize}
-
-\section{Quy trình nghiệp vụ mục tiêu}
-\subsection{Luồng tạo sự kiện}
-\begin{enumerate}
-  \item Người dùng kích hoạt trợ lý và nói yêu cầu tạo lịch.
-  \item VAD xác định ranh giới câu; STT chuyển âm thanh thành văn bản và giao diện hiển thị kết quả.
-  \item NLU phân loại ý định \texttt{create\_event}, trích xuất tiêu đề, thời gian, thời lượng và thông tin tùy chọn.
-  \item Bộ suy luận thời gian dùng thời điểm tham chiếu và múi giờ để chuẩn hóa dữ liệu; bộ kiểm tra phát hiện thiếu tiêu đề, giờ, ngày hoặc khoảng thời gian không hợp lệ.
-  \item Nếu còn thiếu hoặc mơ hồ, trợ lý hỏi một câu làm rõ và giữ trạng thái tác vụ tạm thời. Nếu dữ liệu hợp lệ, trợ lý đọc lại tóm tắt và yêu cầu xác nhận theo chính sách an toàn.
-  \item Sau xác nhận, ứng dụng gọi API tạo sự kiện. Chỉ khi API trả về thành công, trợ lý mới thông báo đã tạo và hiển thị thông tin sự kiện.
-\end{enumerate}
-
-\subsection{Luồng xem, tìm và cập nhật sự kiện}
-Với yêu cầu xem lịch, ứng dụng xác định khoảng thời gian, gọi API đọc dữ liệu và trình bày các sự kiện theo thứ tự thời gian. Với yêu cầu cập nhật hoặc xóa, ứng dụng trước tiên tìm các ứng viên phù hợp bằng tên và thời gian; nếu có nhiều kết quả, phải liệt kê ngắn gọn để người dùng chọn. Sau khi chọn đúng sự kiện, ứng dụng trình bày thay đổi dự kiến; thao tác xóa luôn cần xác nhận tường minh. Khi API từ chối hoặc hết thời gian chờ, tác vụ không được đánh dấu hoàn tất.
-
-\subsection{Các luồng ngoại lệ}
-\begin{itemize}
-  \item \textbf{Không nhận dạng được câu nói:} thông báo chưa hiểu và cho phép thử lại, không phát sinh yêu cầu Calendar.
-  \item \textbf{Thiếu hoặc mơ hồ thời gian:} hỏi lại đúng trường còn thiếu, giữ các thực thể đã xác định trong tác vụ hiện tại.
-  \item \textbf{Chưa kết nối hoặc token hết hạn:} tạm dừng tác vụ, hướng dẫn người dùng kết nối lại; không yêu cầu nhập mật khẩu vào ứng dụng.
-  \item \textbf{Mất mạng, giới hạn API hoặc lỗi máy chủ:} thông báo rằng thao tác chưa được xác nhận, giữ nội dung yêu cầu để người dùng quyết định thử lại.
-  \item \textbf{Người dùng hủy hoặc ngắt lời:} hủy tác vụ chưa gửi; nếu yêu cầu đã gửi, kiểm tra trạng thái từ API trước khi đề xuất thử lại để tránh thao tác trùng.
-\end{itemize}
-
-\section{Kiến trúc tổng thể}
-Kiến trúc ban đầu chia thành các lớp: giao diện desktop; quản lý trạng thái hội thoại; bộ điều phối lệnh; adapter âm thanh và mô hình; lớp nghiệp vụ thời gian/sự kiện; adapter OAuth/Google Calendar; và lớp lưu cấu hình cục bộ. Mỗi adapter có thể được thay thế mà không đổi hợp đồng nghiệp vụ. Luồng chính đi từ microphone qua VAD, từ khóa đánh thức, STT, NLU và chuẩn hóa thời gian; sau bước kiểm tra/xác nhận, bộ điều phối mới gọi Calendar API và gửi kết quả đến giao diện/TTS.
-
-\begin{diagram}[H]
+\begin{diagram}[!htbp]
 \centering
-\begin{tikzpicture}[
-  box/.style={draw,rounded corners=2pt,minimum height=0.95cm,text width=2.35cm,align=center,font=\small},
-  arr/.style={-{Stealth[length=2.5mm]}}]
-  \node[box] (mic) {Microphone};
-  \node[box,right=0.45cm of mic] (vad) {VAD và wake word};
-  \node[box,right=0.45cm of vad] (stt) {STT};
-  \node[box,below=0.85cm of stt] (nlu) {NLU và thực thể};
-  \node[box,left=0.45cm of nlu] (time) {Chuẩn hóa thời gian};
-  \node[box,left=0.45cm of time] (confirm) {Kiểm tra và xác nhận};
-  \node[box,below=0.85cm of confirm] (cal) {Calendar API};
-  \node[box,right=0.45cm of cal] (reply) {Giao diện và phản hồi};
-  \node[box,right=0.45cm of reply] (tts) {TTS tùy chọn};
-  \draw[arr] (mic)--(vad); \draw[arr] (vad)--(stt);
-  \draw[arr] (stt)--(nlu); \draw[arr] (nlu)--(time);
-  \draw[arr] (time)--(confirm); \draw[arr] (confirm)--(cal);
-  \draw[arr] (cal)--(reply); \draw[arr] (reply)--(tts);
+\begin{tikzpicture}
+  % ranh giới hệ thống
+  \draw[rounded corners=3pt] (0,0.3) rectangle (10.4,-7.8);
+  \node[font=\footnotesize\bfseries] at (5.2,-0.1) {Voice Calendar Agent};
+  % ca sử dụng của người dùng
+  \begin{scope}[every node/.style={uc,minimum width=3.7cm}]
+    \node (login)   at (2.35,-1.1) {Đăng nhập,\\kết nối Google};
+    \node (voice)   at (2.35,-2.3) {Ra lệnh bằng\\giọng nói};
+    \node (text)    at (2.35,-3.5) {Nhập lệnh\\văn bản};
+    \node (confirm) at (2.35,-4.7) {Xác nhận hoặc\\hủy thao tác};
+    \node (listen)  at (2.35,-5.9) {Nghe giọng đọc\\phản hồi};
+    \node (logout)  at (2.35,-7.1) {Đăng xuất, ngắt\\kết nối, xóa dữ liệu};
+  \end{scope}
+  % nhóm thao tác lịch
+  \begin{scope}[every node/.style={uc,minimum width=3.1cm}]
+    \node (list)   at (8.3,-1.85) {Xem, tìm sự kiện};
+    \node (create) at (8.3,-3.0)  {Tạo sự kiện};
+    \node (update) at (8.3,-4.15) {Sửa, dời sự kiện};
+    \node (delete) at (8.3,-5.3)  {Xóa sự kiện};
+    \node (free)   at (8.3,-6.45) {Kiểm tra lịch trống};
+  \end{scope}
+  \node[nhom,fit=(list)(free),inner sep=5pt,label={[font=\scriptsize\itshape]above:Thao tác lịch qua agent}] (cal) {};
+  % tác nhân
+  \begin{scope}[shift={(-1.3,-3.7)}]
+    \draw (0,0.55) circle (0.22); \draw (0,0.33)--(0,-0.3); \draw (-0.35,0.1)--(0.35,0.1);
+    \draw (0,-0.3)--(-0.3,-0.8); \draw (0,-0.3)--(0.3,-0.8);
+    \node[font=\footnotesize] at (0,-1.1) {Người dùng};
+    \coordinate (user) at (0.45,0);
+  \end{scope}
+  \node[hop,font=\scriptsize,text width=2.5cm] (ext) at (12.2,-4.15) {{\footnotesize\itshape Hệ thống ngoài}\\Google OAuth,\\Google Calendar,\\Gemini API};
+  \foreach \u in {login,voice,text,confirm,listen,logout} \draw (user) -- (\u.west);
+  \draw[mui,dashed] (voice.east) -- node[nhannen]{«include»} (cal.west|-0,-2.75);
+  \draw[mui,dashed] (text.east) -- node[nhannen]{«include»} (cal.west|-0,-3.5);
+  \draw[mui,dashed] (update.west) -- node[nhannen,pos=0.45]{«include»} ([yshift=1mm]confirm.east);
+  \draw[mui,dashed] (delete.west) -- node[nhannen,pos=0.45]{«include»} ([yshift=-1mm]confirm.east);
+  \draw (10.4,-4.15) -- (ext.west);
 \end{tikzpicture}
-\caption{Luồng xử lý chính của nguyên mẫu đề xuất}\label{dia:pipeline}
+\caption{Sơ đồ ca sử dụng của hệ thống}\label{dia:usecase}
 \nguon{Nhóm thiết kế.}
 \end{diagram}
 
-\section{Thiết kế phân tích ý định và dữ liệu}
-Tập ý định tối thiểu gồm \texttt{list\_events}, \texttt{create\_event}, \texttt{find\_event}, \texttt{update\_event}, \texttt{delete\_event}, \texttt{cancel} và \texttt{unknown}. Kết quả phân tích gồm ý định, thực thể, độ tin cậy và các trường còn thiếu; kết quả này chưa trực tiếp gọi API. Lớp nghiệp vụ kiểm tra quyền, thời gian, sự kiện mục tiêu và chính sách xác nhận trước khi tạo lệnh Calendar.
+\subsection{Yêu cầu chức năng}
+Bảng~\ref{tab:functional-requirements} liệt kê các yêu cầu chức năng cùng mức ưu tiên. Mã yêu cầu (FR) được dùng lại khi đánh giá mức độ đáp ứng ở Chương~\ref{ch:impl}.
 
-\begin{table}[H]
-\caption{Các trường sự kiện cần quản lý}\label{tab:event-fields}
-\renewcommand{\arraystretch}{1.15}
-\begin{tabular}{|>{\raggedright\arraybackslash}p{3.2cm}|>{\raggedright\arraybackslash}p{4.0cm}|>{\raggedright\arraybackslash}p{7.0cm}|}\hline
-\textbf{Trường} & \textbf{Bắt buộc khi tạo} & \textbf{Quy tắc ban đầu}\\\hline
-Tiêu đề & Có & Giữ nội dung người dùng cung cấp; hỏi lại nếu không xác định được.\\\hline
-Bắt đầu & Có & Chuẩn hóa từ biểu thức thời gian theo múi giờ đã chọn.\\\hline
-Kết thúc/thời lượng & Có theo quy tắc nghiệp vụ & Nếu người dùng chỉ nêu thời điểm bắt đầu, hỏi thời lượng hoặc áp dụng mặc định chỉ khi đã được công bố và xác nhận.\\\hline
-Múi giờ & Có về mặt xử lý & Mặc định ban đầu là \texttt{Asia/Ho\_Chi\_Minh}; cho phép thay đổi trong cấu hình.\\\hline
-Địa điểm/mô tả/người tham dự & Không & Chỉ ghi khi được người dùng nêu rõ; không suy diễn từ ngữ cảnh không chắc chắn.\\\hline
-Mã sự kiện & Có cho cập nhật/xóa & Lấy từ Calendar API; không định danh sự kiện chỉ bằng tiêu đề nếu có nhiều kết quả phù hợp.\\\hline
-\end{tabular}
-\nguon{Nhóm đề xuất từ nghiệp vụ sự kiện Google Calendar.}
+{\bang
+\begin{longtable}{|C{1.4cm}|L{11.37cm}|C{1.9cm}|}
+\caption{Yêu cầu chức năng}\label{tab:functional-requirements}\\\hline
+\td{Mã} & \td{Mô tả yêu cầu} & \td{Ưu tiên}\\\hline
+\endfirsthead
+\hline\td{Mã} & \td{Mô tả yêu cầu} & \td{Ưu tiên}\\\hline
+\endhead
+FR-01 & Đăng nhập bằng tài khoản Google qua trình duyệt hệ thống; hiển thị trạng thái đăng nhập và trạng thái kết nối lịch; đăng xuất. & Cao\\\hline
+FR-02 & Ngắt kết nối Google (thu hồi quyền, chuyển về lịch nội bộ) và xóa tài khoản cùng toàn bộ dữ liệu liên quan. & Trung bình\\\hline
+FR-03 & Bật/tắt chế độ nghe; hiển thị rõ trạng thái microphone; không thu âm khi chế độ nghe đã tắt. & Cao\\\hline
+FR-04 & Tự phát hiện đoạn tiếng nói, nhận dạng thành văn bản tiếng Việt hoặc tiếng Anh và hiển thị bản chép cho người dùng. & Cao\\\hline
+FR-05 & Nhận lệnh bằng văn bản (gõ hoặc chọn câu lệnh mẫu) với cùng năng lực như lệnh giọng nói. & Cao\\\hline
+FR-06 & Xem lịch theo ngày, buổi hoặc khoảng thời gian; kết quả gồm tiêu đề, giờ bắt đầu và kết thúc của từng sự kiện. & Cao\\\hline
+FR-07 & Tạo sự kiện từ câu lệnh; suy luận ngày giờ tương đối; hỏi lại khi thiếu thời gian; không tạo sự kiện vào ngày đã qua. & Cao\\\hline
+FR-08 & Sửa hoặc dời sự kiện: xác định đúng sự kiện theo tên và/hoặc thời gian; liệt kê các ứng viên để người dùng chọn khi có nhiều khả năng. & Cao\\\hline
+FR-09 & Xóa sự kiện với cùng cơ chế xác định sự kiện mục tiêu như FR-08. & Cao\\\hline
+FR-10 & Kiểm tra người dùng rảnh hay bận trong một thời điểm hoặc khoảng thời gian. & Trung bình\\\hline
+FR-11 & Yêu cầu xác nhận trước khi sửa/xóa; chấp nhận xác nhận bằng nút bấm hoặc câu trả lời ngắn; thao tác chờ xác nhận có thời hạn. & Cao\\\hline
+FR-12 & Chỉ thông báo thành công sau khi dịch vụ lịch xác nhận; khi thất bại nêu nguyên nhân phù hợp và bước tiếp theo (ví dụ đăng nhập lại Google). & Cao\\\hline
+FR-13 & Đọc phản hồi bằng giọng tổng hợp theo từng câu; cho phép dừng đọc và nghe lại; không thu lại tiếng loa thành câu lệnh. & Trung bình\\\hline
+FR-14 & Lưu lịch sử hội thoại theo từng người dùng; cho phép xem lại và xóa. & Trung bình\\\hline
+FR-15 & Lưu cài đặt cá nhân: múi giờ, ngôn ngữ, giọng đọc, bật/tắt yêu cầu xác nhận. & Thấp\\\hline
+FR-16 & Kích hoạt bằng từ khóa đánh thức và chạy nền thường trú ở khay hệ thống. & Trung bình\\\hline
+\end{longtable}}
+\nguon{Nhóm phân tích. Mức độ đáp ứng từng yêu cầu được đánh giá ở Bảng~\ref{tab:fr-status}.}
+
+\subsection{Yêu cầu phi chức năng}
+Các yêu cầu phi chức năng được nhóm theo thuộc tính chất lượng (Bảng~\ref{tab:nonfunctional}); chúng chi phối các quyết định kiến trúc trình bày ở mục~\ref{sec:architecture}.
+
+\begin{table}[!htbp]
+\caption{Yêu cầu phi chức năng}\label{tab:nonfunctional}
+\bang
+\begin{tabularx}{\textwidth}{|L{2.8cm}|Y|}\hline
+\td{Nhóm} & \td{Yêu cầu}\\\hline
+Bảo mật & Khóa API, client secret và token Google chỉ nằm ở máy chủ; token Google được mã hóa khi lưu; ứng dụng desktop chỉ giữ token phiên của chính người dùng và không để lộ cho tiến trình giao diện.\\\hline
+Quyền riêng tư & Âm thanh nền không rời máy người dùng (VAD chạy tại chỗ); nhật ký máy chủ không chứa token, âm thanh hay nội dung câu lệnh ở mức ghi mặc định.\\\hline
+Độ tin cậy & Thao tác ghi lịch có kiểm tra dữ liệu, xử lý quá thời gian và lỗi tạm thời của dịch vụ ngoài, không thực hiện trùng khi thử lại, không báo thành công giả.\\\hline
+Khả năng thay thế & STT, TTS, bộ trích xuất ý định và dịch vụ lịch nằm sau giao diện trừu tượng; đổi nhà cung cấp không ảnh hưởng nghiệp vụ.\\\hline
+Khả năng kiểm thử & Đồng hồ, múi giờ và các dịch vụ ngoài được “tiêm” vào từ ngoài để kiểm thử tất định; có kiểm thử tự động ở ba mức.\\\hline
+Khả năng sử dụng & Phân biệt rõ các trạng thái: đang nghe, đang nhận dạng, đang xử lý, đang đọc, chờ xác nhận, lỗi; phản hồi ngắn gọn bằng ngôn ngữ của người dùng.\\\hline
+Hiệu năng & Đo độ trễ theo từng giai đoạn cho mỗi lượt lệnh; mỗi lời gọi dịch vụ ngoài có giới hạn thời gian và phương án dự phòng.\\\hline
+\end{tabularx}
+\nguon{Nhóm phân tích.}
 \end{table}
 
-\section{Thiết kế xử lý thời gian}
-Mọi phép suy luận thời gian sử dụng một đối tượng thời điểm tham chiếu cố định cho toàn bộ lượt lệnh để tránh thay đổi ngày trong lúc xử lý. Bộ phân tích tạo ra giá trị có cấu trúc gồm thời điểm bắt đầu, kết thúc hoặc thời lượng, múi giờ và mức độ đầy đủ. Bộ kiểm tra xác minh thời điểm kết thúc sau thời điểm bắt đầu, thời lượng hợp lệ và biểu thức ngày giờ không còn cách hiểu cạnh tranh.
+\section{Kiến trúc tổng thể}\label{sec:architecture}
+\subsection{Các thành phần}
+Hệ thống gồm hai phần mềm do nhóm phát triển (Sơ đồ~\ref{dia:architecture}):
+\begin{itemize}
+  \item \textbf{Ứng dụng desktop} \textit{voice-calendar-agent} (Electron): tiến trình giao diện thu âm, chạy VAD, hiển thị hội thoại và phát âm thanh; tiến trình chính giữ phiên đăng nhập và là nơi duy nhất gọi backend.
+  \item \textbf{Dịch vụ} \textit{voice-backend} (Fastify): cung cấp API REST dưới tiền tố \ma{/api/v1} và một kênh WebSocket; gồm bảy mô-đun \textit{health, auth, users, calendar, agent, voice, realtime}.
+\end{itemize}
+Backend kết nối tới PostgreSQL và các dịch vụ ngoài: Google OAuth, Google Calendar API, Gemini API; Piper được chạy như tiến trình con trên chính máy chủ. Trong sơ đồ, \textit{lớp nền} là các plugin dùng chung cho mọi tuyến; các \textit{bộ nối} tới dịch vụ ngoài nằm trong từng mô-đun và đều ẩn sau giao diện trừu tượng.
 
-Nếu không thể xác định duy nhất thời điểm, hệ thống không chọn phương án ngầm định mà hỏi lại bằng cách đưa ra lựa chọn cụ thể, ví dụ xác nhận ngày hoặc buổi trong ngày. Các ca kiểm thử ban đầu cần bao gồm ngày tuyệt đối, ngày tương đối, thứ trong tuần, qua nửa đêm, thiếu năm, thiếu giờ, thiếu thời lượng và thay đổi múi giờ. Quy tắc cho sự kiện lặp lại sẽ được đưa ra ngoài phạm vi tối thiểu cho tới khi luồng sự kiện đơn được xác minh.
+\begin{diagram}[!htbp]
+\centering
+\begin{tikzpicture}
+  % --- ứng dụng desktop
+  \node[hop,font=\scriptsize,text width=3.8cm,minimum height=1.95cm] (renderer) at (0,0)
+    {{\footnotesize\bfseries Renderer (React)}\\giao diện hội thoại,\\microphone, Silero VAD,\\hàng đợi phát âm thanh};
+  \node[hop,font=\scriptsize,text width=3.8cm,minimum height=1.95cm] (main) at (0,-3.9)
+    {{\footnotesize\bfseries Main process}\\BackendClient, đăng nhập\\(loopback + PKCE), lưu\\phiên bằng safeStorage};
+  \draw[muihai] (renderer) -- node[nhan,right=2pt]{IPC qua\\preload} (main);
+  \node[nhom,fit=(renderer)(main),label={[font=\footnotesize\bfseries]above:Ứng dụng desktop (Electron)}] (desk) {};
+  % --- backend
+  \node[hopdam,font=\scriptsize,text width=4.82cm,minimum height=1.5cm] (core) at (7.39,0.225)
+    {Lớp nền: helmet, CORS,\\giới hạn tần suất, xác thực JWT,\\phong bì lỗi, OpenAPI};
+  \foreach \ten/\x/\y in {auth/5.63/-1.18, users/7.39/-1.18, calendar/9.15/-1.18,
+                          agent/5.63/-2.15, voice/7.39/-2.15, realtime/9.15/-2.15, health/7.39/-3.12}
+    \node[hop,minimum width=1.58cm,minimum height=0.75cm] (\ten) at (\x,\y) {\ten};
+  \node[hopdam,font=\scriptsize,text width=4.82cm,minimum height=1.1cm] (adapter) at (7.39,-4.325)
+    {Bộ nối tới dịch vụ ngoài:\\Prisma, Google, Gemini, Piper};
+  \node[nhom,fit=(core)(auth)(calendar)(adapter),label={[font=\footnotesize\bfseries]above:voice-backend (Fastify)}] (be) {};
+  % --- dịch vụ ngoài
+  \begin{scope}[every node/.style={hop,font=\scriptsize,text width=2.25cm,minimum height=0.75cm}]
+    \node (pg)     at (12.0,0.6)    {PostgreSQL};
+    \node (goauth) at (12.0,-0.55)  {Google OAuth};
+    \node[minimum height=1.0cm] (gcal)  at (12.0,-1.825) {Google\\Calendar API};
+    \node (gem)    at (12.0,-3.1)   {Gemini API};
+    \node[minimum height=1.0cm] (piper) at (12.0,-4.375) {Piper\\(tiến trình con)};
+  \end{scope}
+  % --- liên kết
+  \draw[mui] ([yshift=3.5mm]main.east) -- ([yshift=3.5mm]be.west|-main.east);
+  \node[nhan,anchor=south] at ([yshift=3.5mm+1pt]$(desk.east|-main.east)!0.5!(be.west|-main.east)$) {REST /api/v1\\Bearer JWT};
+  \draw[muihai,dashed] ([yshift=-3.5mm]main.east) -- ([yshift=-3.5mm]be.west|-main.east);
+  \node[nhan,anchor=north] at ([yshift=-3.5mm-1pt]$(desk.east|-main.east)!0.5!(be.west|-main.east)$) {WebSocket\\/api/v1/ws};
+  \foreach \e in {pg,goauth,gcal,gem,piper} \draw[mui] (be.east|-\e) -- (\e.west);
+\end{tikzpicture}
+\caption{Kiến trúc tổng thể của hệ thống}\label{dia:architecture}
+\nguon{Nhóm thiết kế. Kênh WebSocket (nét đứt) đã có ở backend; ứng dụng desktop hiện dùng các API REST.}
+\end{diagram}
 
-\section{Quản lý trạng thái hội thoại}
-Hội thoại được mô hình hóa thành các trạng thái: \texttt{Idle}, \texttt{Listening}, \texttt{Recognizing}, \texttt{Interpreting}, \texttt{AwaitingClarification}, \texttt{AwaitingConfirmation}, \texttt{Executing}, \texttt{Speaking} và \texttt{Error}. Mỗi lượt lưu tạm ý định, thực thể đã xác định, trường còn thiếu, mã sự kiện được chọn (nếu có), nội dung đang chờ xác nhận và thời điểm hết hạn tác vụ. Khi người dùng trả lời câu hỏi làm rõ, chỉ gộp câu trả lời vào tác vụ hiện tại nếu ngữ cảnh còn hiệu lực; khi người dùng hủy hoặc hết hạn, xóa trạng thái chờ.
+\subsection{Nguyên tắc thiết kế}
+\begin{itemize}
+  \item \textbf{Client mỏng:} ứng dụng desktop không chứa khóa API, client secret hay token Google; mọi thao tác đặc quyền nằm ở backend.
+  \item \textbf{Tách tầng rõ ràng trong ứng dụng:} tiến trình giao diện không bao giờ nhìn thấy token; mọi lời gọi đi theo đường renderer → IPC → main → backend.
+  \item \textbf{Mô-đun hóa backend:} mỗi mô-đun công bố một giao diện dịch vụ; các mô-đun được nối với nhau tại một nơi duy nhất (container) theo thứ tự phụ thuộc \textit{auth → users → calendar → agent → voice}.
+  \item \textbf{Nhà cung cấp thay thế được:} STT, TTS, mô hình ngôn ngữ, cổng OAuth và API lịch đều là giao diện; bản hiện thực thật và bản giả lập cho kiểm thử dùng chung hợp đồng.
+  \item \textbf{Thất bại tường minh:} thành phần không khả dụng trả lỗi có mã rõ ràng (ví dụ \ma{STT_UNAVAILABLE}) thay vì âm thầm trả kết quả giả.
+\end{itemize}
 
-Ở giai đoạn đầu, chỉ cần bộ nhớ ngắn hạn trong phiên và nhật ký kỹ thuật tối thiểu. Không cần bộ nhớ dài hạn để quản lý lịch; dữ liệu lịch vẫn thuộc quyền kiểm soát của Google Calendar. Bản ghi log không lưu âm thanh thô, access token, refresh token hoặc toàn bộ hội thoại theo mặc định.
+\subsection{Luồng xử lý một lệnh giọng nói}
+Sơ đồ~\ref{dia:voice-seq} mô tả luồng hiện tại của một lệnh giọng nói qua các API REST. Ba chặng gọi backend (nhận dạng, thực thi lệnh, tổng hợp từng câu) tách rời nhau, nhờ đó giao diện hiển thị được bản chép ngay khi có và phát câu đầu tiên trong khi các câu sau còn đang được tổng hợp.
 
-\section{Thiết kế kết nối Google Calendar}
-Màn hình cài đặt dự kiến có trạng thái chưa kết nối/đã kết nối, nút kết nối hoặc ngắt kết nối và thông tin giải thích quyền được yêu cầu. Khi kết nối, ứng dụng mở trình duyệt hệ thống để người dùng đăng nhập và cấp quyền; ứng dụng không dựng biểu mẫu nhập mật khẩu. Sau khi callback hợp lệ, token được gửi qua lớp dịch vụ đặc quyền và lưu trong kho bảo mật của hệ điều hành.
+\begin{diagram}[!htbp]
+\centering
+\begin{tikzpicture}
+  \def\xa{0}\def\xb{4.1}\def\xc{7.6}\def\xd{10.95}\def\xe{13.6}
+  \node[seqhead,text width=2.1cm] at (\xa,0) {Renderer};
+  \node[seqhead,text width=2.1cm] at (\xb,0) {Main process};
+  \node[seqhead,text width=2.1cm] at (\xc,0) {voice-backend};
+  \node[seqhead,text width=2.1cm] at (\xd,0) {Gemini,\\Piper};
+  \node[seqhead,text width=2.1cm] at (\xe,0) {Dịch vụ lịch};
+  \foreach \x in {\xa,\xb,\xc,\xd,\xe} \draw[seqline] (\x,-0.48) -- (\x,-14.5);
+  \tntu[west]{1.2}{0.15}{VAD cắt đoạn tiếng nói,\\mã hóa WAV 16 kHz}
+  \tn{2.3}{\xa}{\xb}{IPC stt:transcribe}
+  \tn{2.95}{\xb}{\xc}{POST /voice/transcribe}
+  \tn{3.6}{\xc}{\xd}{Gemini: chép lời}
+  \tnve{4.25}{\xd}{\xc}{văn bản, ngôn ngữ}
+  \tnve{4.9}{\xc}{\xa}{bản chép (hiển thị cho người dùng)}
+  \tn{5.75}{\xa}{\xb}{IPC agent:execute-command}
+  \tn{6.4}{\xb}{\xc}{POST /agent/command}
+  \tn{7.05}{\xc}{\xd}{Gemini: ý định (JSON)}
+  \tnve{7.7}{\xd}{\xc}{ý định, thực thể}
+  \tntu{8.45}{\xc}{bộ luật dự phòng, suy luận\\ngày giờ, kiểm tra nghiệp vụ}
+  \tn{9.5}{\xc}{\xe}{đọc / ghi sự kiện}
+  \tnve{10.15}{\xe}{\xc}{kết quả đã xác nhận}
+  \tnve{10.8}{\xc}{\xa}{câu trả lời, sự kiện, thao tác chờ xác nhận (nếu có)}
+  \tn{11.65}{\xa}{\xb}{IPC tts:piper:synthesize}
+  \tn{12.3}{\xb}{\xc}{POST /tts/synthesize}
+  \tn{12.95}{\xc}{\xd}{Piper: tổng hợp}
+  \tnve{13.6}{\xd}{\xc}{WAV}
+  \tnve{14.25}{\xc}{\xa}{âm thanh từng câu → hàng đợi phát}
+\end{tikzpicture}
+\caption{Trình tự xử lý một lệnh giọng nói}\label{dia:voice-seq}
+\nguon{Nhóm thiết kế, theo mã nguồn ứng dụng desktop và backend.}
+\end{diagram}
 
-Adapter Calendar cung cấp các thao tác đọc, tạo, cập nhật, xóa với kiểu dữ liệu nội bộ thống nhất. Lỗi API được ánh xạ thành nhóm có thể xử lý như chưa xác thực, không đủ quyền, không tìm thấy, xung đột dữ liệu, giới hạn tốc độ, timeout và lỗi máy chủ. Lớp giao diện chỉ nhận thông báo đã làm sạch, không nhận token hoặc chi tiết nhạy cảm của phản hồi thô.
+\section{Thiết kế ứng dụng desktop}\label{sec:desktop-design}
+\subsection{Phân tách tiến trình và hợp đồng IPC}
+Tiến trình giao diện chạy với cô lập ngữ cảnh; preload script công bố cho giao diện đối tượng \ma{window.api} gồm 17 hàm gọi và một sự kiện đẩy (Bảng~\ref{tab:ipc}); tiến trình chính chỉ đăng ký xử lý đúng các kênh này. Hợp đồng này được khai báo một lần bằng kiểu TypeScript và dùng chung cho cả ba phía (renderer, preload, main), nên sai lệch tham số bị phát hiện khi biên dịch.
+
+\begin{table}[!htbp]
+\caption{Các kênh IPC giữa tiến trình giao diện và tiến trình chính}\label{tab:ipc}
+\bang
+\begin{tabularx}{\textwidth}{|L{2.0cm}|L{5.3cm}|Y|}\hline
+\td{Nhóm} & \td{Kênh} & \td{Chức năng}\\\hline
+Agent & \ma{agent:execute-command}, \ma{agent:confirm-action}, \ma{agent:reject-action} & Gửi câu lệnh; xác nhận hoặc hủy thao tác đang chờ.\\\hline
+Lịch & \ma{calendar:get-status}, \ma{calendar:list-events} & Trạng thái nguồn lịch (Google/nội bộ); liệt kê sự kiện.\\\hline
+Tài khoản & \ma{auth:get-status}, \ma{auth:sign-in-google}, \ma{auth:sign-in-dev}, \ma{auth:cancel-sign-in}, \ma{auth:sign-out}, \ma{auth:disconnect-google} & Đăng nhập Google, đăng nhập tài khoản phát triển, hủy đăng nhập đang dở, đăng xuất, ngắt kết nối Google.\\\hline
+STT & \ma{stt:transcribe}, \ma{stt:get-status} & Gửi đoạn âm thanh để nhận dạng; trạng thái bộ STT.\\\hline
+TTS & \ma{tts:piper:synthesize}, \ma{tts:piper:get-status}, \ma{tts:piper:get-voices}, \ma{tts:piper:set-voice} & Tổng hợp một đoạn văn bản; trạng thái, danh sách và lựa chọn giọng đọc.\\\hline
+Sự kiện đẩy & \ma{auth:changed} & Main báo cho giao diện khi trạng thái đăng nhập thay đổi (đăng nhập, đăng xuất, phiên bị máy chủ thu hồi).\\\hline
+\end{tabularx}
+\nguon{Tệp \texttt{src/shared/ipc.ts} của ứng dụng desktop.}
+\end{table}
+
+\subsection{Quản lý phiên đăng nhập phía ứng dụng}
+Lớp \textit{BackendClient} ở tiến trình chính là nơi duy nhất giữ cặp access token/refresh token. Các điểm thiết kế đáng chú ý:
+\begin{itemize}
+  \item Access token được làm mới trước khi hết hạn 30 giây. Các yêu cầu đồng thời cùng cần làm mới được gộp thành \textit{một} lời gọi (single-flight), vì máy chủ coi việc dùng lại refresh token là dấu hiệu bị đánh cắp và sẽ thu hồi cả chuỗi phiên.
+  \item Phiên được lưu xuống đĩa dưới dạng đã mã hóa bằng \ma{safeStorage}, ghi tệp theo kiểu nguyên tử (ghi tệp tạm rồi đổi tên). Nếu hệ điều hành không cung cấp được kho khóa an toàn (kể cả trường hợp Linux rơi về chế độ \ma{basic_text}), ứng dụng \textit{không} ghi token dạng rõ mà chỉ giữ phiên trong bộ nhớ; người dùng đăng nhập lại ở lần mở sau.
+  \item Tệp cấu hình \ma{.env} của ứng dụng chỉ được đọc hai khóa \ma{VOICE_BACKEND_URL} và \ma{VOICE_BACKEND_DEV_EMAIL}; mọi khóa khác bị bỏ qua.
+  \item Cửa sổ chỉ hiển thị giao diện đóng gói sẵn; mọi điều hướng khác và liên kết ngoài được chuyển cho trình duyệt hệ thống, và chỉ với giao thức http/https. Quyền thiết bị chỉ cấp cho microphone.
+\end{itemize}
+
+\subsection{Pipeline giọng nói phía ứng dụng}
+Pipeline phía ứng dụng được mô hình hóa thành máy trạng thái (Bảng~\ref{tab:vadstate}). Để tránh vòng phản hồi, mọi đoạn tiếng nói bắt đầu trong lúc trợ lý đang đọc, hoặc trong 400 ms ngay sau khi đọc xong, đều bị bỏ qua. Sau khi VAD trả về một đoạn tiếng nói, ứng dụng mã hóa thành WAV đơn kênh 16 kHz rồi gửi tới backend để nhận dạng (ứng dụng có thử Web Speech API của Chromium trước nếu môi trường hỗ trợ \cite{webspeech}). Bản chép rỗng không được chuyển cho agent.
+
+\begin{table}[!htbp]
+\caption{Các trạng thái của pipeline giọng nói phía ứng dụng}\label{tab:vadstate}
+\bang
+\begin{tabularx}{\textwidth}{|L{4.1cm}|Y|}\hline
+\td{Trạng thái} & \td{Ý nghĩa}\\\hline
+\ma{idle} & Chưa nghe; microphone đã được giải phóng.\\\hline
+\ma{initializing} & Đang xin quyền microphone và nạp mô hình VAD.\\\hline
+\ma{listening} & Đang nghe, chưa có tiếng nói.\\\hline
+\ma{speaking} & VAD phát hiện người dùng đang nói.\\\hline
+\ma{speech-ended}, \ma{transcribing} & Người dùng vừa dứt lời; đoạn âm thanh đang được nhận dạng.\\\hline
+\ma{processing} & Bản chép đã có; agent đang xử lý câu lệnh.\\\hline
+\ma{speaking-assistant} & Trợ lý đang đọc phản hồi; microphone tạm bị bỏ qua.\\\hline
+\ma{success}, \ma{error} & Lượt lệnh kết thúc thành công hoặc gặp lỗi; quay lại \ma{listening} nếu chế độ nghe còn bật.\\\hline
+\end{tabularx}
+\nguon{Tệp \texttt{useVoiceActivity.ts} của ứng dụng desktop.}
+\end{table}
+
+Phần phát giọng đọc gồm ba lớp: bộ định dạng chuyển câu trả lời thành văn bản dễ đọc; bộ tách câu; và hàng đợi TTS phát tuần tự từng câu, hỗ trợ dừng giữa chừng. Mỗi lượt lệnh được gắn một mã tương tác và ghi lại các mốc thời gian (bắt đầu nói, dứt lời, có bản chép, agent trả lời, câu đầu tiên, bắt đầu phát âm thanh), từ đó tính các chỉ số STT, Agent, TTFS, TTFA và tổng thời gian để hiển thị trong mục “Chi tiết” của giao diện.
+
+\section{Thiết kế backend}
+\subsection{Các mô-đun}
+Backend gồm bảy mô-đun; Bảng~\ref{tab:modules} nêu trách nhiệm của từng mô-đun và các thành phần mà nó phụ thuộc.
+
+\begin{table}[!htbp]
+\caption{Các mô-đun của backend}\label{tab:modules}
+\bang
+\begin{tabularx}{\textwidth}{|L{1.8cm}|Y|L{3.3cm}|}\hline
+\td{Mô-đun} & \td{Trách nhiệm} & \td{Phụ thuộc}\\\hline
+health & Kiểm tra sống (\ma{/health}) và sẵn sàng (\ma{/ready}, có truy vấn thử cơ sở dữ liệu). & –\\\hline
+auth & Đăng nhập Google (OAuth 2.0 + PKCE), phát hành và xoay vòng token phiên, lưu và làm mới thông tin xác thực Google, đăng nhập phát triển. & CSDL, Google OAuth\\\hline
+users & Hồ sơ, cài đặt cá nhân, xóa tài khoản. & auth\\\hline
+calendar & Giao diện lịch thống nhất với hai bản hiện thực: Google Calendar và lịch nội bộ; kiểm tra lịch trống. & auth, users, Google Calendar API\\\hline
+agent & Điều phối câu lệnh: trích xuất ý định, suy luận thời gian, tìm sự kiện mục tiêu, thao tác chờ xác nhận, lịch sử hội thoại. & calendar, users, Gemini (tùy chọn)\\\hline
+voice & STT (Gemini hoặc giả lập), TTS (Piper hoặc giả lập), kiểm tra và phân tích âm thanh. & Gemini, Piper\\\hline
+realtime & Kênh WebSocket và điểm cuối \ma{/voice/command} gộp ba bước trong một yêu cầu. & agent, voice\\\hline
+\end{tabularx}
+\nguon{Tài liệu thiết kế \texttt{docs/DESIGN.md} của backend.}
+\end{table}
+
+\subsection{Các quy ước chung}
+\begin{itemize}
+  \item \textbf{Cấu hình:} mọi biến môi trường được kiểm tra bằng lược đồ khi khởi động; cấu hình sai làm dịch vụ dừng ngay và liệt kê toàn bộ lỗi. Một số cấu hình nguy hiểm bị từ chối ở chế độ production (bật đăng nhập phát triển, dùng STT giả lập).
+  \item \textbf{Lỗi:} mọi phản hồi lỗi có cùng một dạng phong bì gồm mã lỗi, thông điệp, chi tiết và mã yêu cầu; có 17 mã lỗi (ví dụ \ma{VALIDATION_ERROR}, \ma{UNAUTHORIZED}, \ma{GOOGLE_REAUTH_REQUIRED}, \ma{RATE_LIMITED}, \ma{STT_UNAVAILABLE}). Thông điệp của lỗi 5xx luôn chung chung, không lộ thông tin nội bộ hay thông điệp gốc của dịch vụ ngoài.
+  \item \textbf{Thời gian:} mọi mốc thời gian trao đổi qua API ở dạng ISO-8601 có độ lệch múi giờ; múi giờ hiệu lực của một yêu cầu được xác định theo thứ tự: tham số của yêu cầu → cài đặt người dùng → mặc định của máy chủ. Logic nghiệp vụ không gọi trực tiếp đồng hồ hệ thống mà nhận một đối tượng đồng hồ, cho phép kiểm thử với thời điểm cố định.
+  \item \textbf{Cô lập dữ liệu:} mọi truy vấn gắn với mã người dùng; truy cập tài nguyên của người khác trả về 404 để không tiết lộ sự tồn tại. Các tuyến cần đăng nhập trả 401 trước khi kiểm tra nội dung yêu cầu.
+  \item \textbf{Giới hạn tần suất:} giới hạn toàn cục theo người dùng hoặc theo IP, cộng thêm giới hạn riêng cho nhóm tuyến xác thực, giọng nói và lệnh agent (mục~\ref{sec:security-design}).
+\end{itemize}
+
+\section{Thiết kế cơ sở dữ liệu}
+Cơ sở dữ liệu PostgreSQL gồm chín bảng (Sơ đồ~\ref{dia:erd}, Bảng~\ref{tab:db}). Mọi khóa chính là UUID; mốc thời gian dùng kiểu có múi giờ. Mọi quan hệ tới \ma{users} đều xóa dây chuyền, nên xóa tài khoản sẽ xóa sạch dữ liệu của người dùng đó.
+
+\begin{diagram}[!htbp]
+\centering
+\begin{tikzpicture}
+  \node[thucthe,anchor=north] (cred) at (0,0) {\textbf{google\_credentials}\nodepart{two}id (PK)\\userId (FK, duy nhất)\\encryptedRefreshToken\\encryptedAccessToken\\scopes[ ], revokedAt};
+  \node[thucthe,anchor=north] (sess) at (5.6,0) {\textbf{sessions}\nodepart{two}id (PK)\\userId (FK), familyId\\tokenHash (duy nhất)\\expiresAt, revokedAt\\replacedById};
+  \node[thucthe,anchor=north] (code) at (11.2,0) {\textbf{login\_codes}\nodepart{two}id (PK), userId (FK)\\codeHash (duy nhất)\\codeChallenge\\redirectUri\\expiresAt, usedAt};
+  \node[thucthe,anchor=north] (event) at (0,-4.0) {\textbf{local\_events}\nodepart{two}id (PK), userId (FK)\\summary, description\\location, status\\startAt, endAt, allDay\\timeZone};
+  \node[thucthe,anchor=north] (user) at (5.6,-4.0) {\textbf{users}\nodepart{two}id (PK), email (duy nhất)\\googleSub (duy nhất)\\timeZone, language\\ttsVoiceId\\requireConfirmation\\calendarProvider};
+  \node[thucthe,anchor=north] (conv) at (11.2,-4.0) {\textbf{conversations}\nodepart{two}id (PK)\\userId (FK)\\title\\createdAt, updatedAt};
+  \node[thucthe,anchor=north] (state) at (0,-8.3) {\textbf{oauth\_states}\nodepart{two}id (PK)\\stateHash (duy nhất)\\encryptedCodeVerifier\\clientCodeChallenge\\redirectUri, expiresAt};
+  \node[thucthe,anchor=north] (pend) at (5.6,-8.3) {\textbf{pending\_actions}\nodepart{two}id (PK), userId (FK)\\conversationId (FK, null)\\type, provider, eventId\\payload (JSON)\\status, expiresAt};
+  \node[thucthe,anchor=north] (msg) at (11.2,-8.3) {\textbf{messages}\nodepart{two}id (PK)\\conversationId (FK)\\role, content, source\\intent, success\\events, metadata (JSON)};
+  \begin{scope}[every node/.style={font=\scriptsize,fill=white,inner sep=1pt}]
+    \draw (user.north west) -- node[pos=0.2]{1} node[pos=0.8]{0..1} (cred.south east);
+    \draw (user) -- node[pos=0.25]{1} node[pos=0.75]{n} (sess);
+    \draw (user.north east) -- node[pos=0.2]{1} node[pos=0.8]{n} (code.south west);
+    \draw (user.west|-event) -- node[pos=0.25]{1} node[pos=0.75]{n} (event);
+    \draw (user.east|-conv) -- node[pos=0.25]{1} node[pos=0.75]{n} (conv);
+    \draw (user) -- node[pos=0.25]{1} node[pos=0.75]{n} (pend);
+    \draw (conv) -- node[pos=0.25]{1} node[pos=0.75]{n} (msg);
+    \draw (conv.south west) -- node[pos=0.2]{0..1} node[pos=0.8]{n} (pend.north east);
+  \end{scope}
+\end{tikzpicture}
+\caption{Mô hình dữ liệu quan hệ của backend}\label{dia:erd}
+\nguon{Nhóm vẽ từ tệp \texttt{prisma/schema.prisma}; chỉ liệt kê các cột chính.}
+\end{diagram}
+
+\begin{table}[!htbp]
+\caption{Mục đích của các bảng dữ liệu}\label{tab:db}
+\bang
+\begin{tabularx}{\textwidth}{|L{3.3cm}|Y|}\hline
+\td{Bảng} & \td{Mục đích}\\\hline
+\ma{users} & Người dùng và cài đặt cá nhân; cột \ma{calendarProvider} cho biết đang dùng Google Calendar hay lịch nội bộ.\\\hline
+\ma{google_credentials} & Refresh token và access token Google đã mã hóa AES-256-GCM, danh sách quyền được cấp, dấu thời gian bị thu hồi.\\\hline
+\ma{sessions} & Refresh token của hệ thống ở dạng băm SHA-256; \ma{familyId} gom các token sinh ra từ cùng một lần đăng nhập để thu hồi cả chuỗi khi phát hiện tái sử dụng.\\\hline
+\ma{oauth_states} & Trạng thái tạm của một lần đăng nhập Google đang diễn ra (băm của \textit{state}, \textit{code verifier} phía Google đã mã hóa, thử thách PKCE của ứng dụng); hết hạn sau 10 phút.\\\hline
+\ma{login_codes} & Mã đăng nhập dùng một lần (lưu dạng băm) để ứng dụng đổi lấy token; hết hạn sau 120 giây.\\\hline
+\ma{local_events} & Sự kiện của lịch nội bộ, dùng cho người dùng chưa kết nối Google.\\\hline
+\ma{conversations}, \ma{messages} & Lịch sử hội thoại: mỗi tin nhắn lưu vai trò, nội dung, nguồn (văn bản/giọng nói/nút bấm), ý định, kết quả và các sự kiện liên quan.\\\hline
+\ma{pending_actions} & Thao tác sửa/xóa đang chờ xác nhận: loại, sự kiện mục tiêu, nội dung thay đổi đề xuất, trạng thái và thời điểm hết hạn.\\\hline
+\end{tabularx}
+\nguon{Nhóm tổng hợp từ lược đồ cơ sở dữ liệu.}
+\end{table}
+
+\section{Thiết kế xác thực và ủy quyền}
+\subsection{Đăng nhập Google với PKCE ở hai chặng}
+Ứng dụng desktop không phải là client OAuth của Google; client của Google là backend (loại ứng dụng web, có client secret nằm ở máy chủ). Giữa ứng dụng và backend, nhóm thiết kế một luồng tương tự Authorization Code + PKCE theo RFC 8252; giữa backend và Google cũng dùng PKCE. Như vậy PKCE được áp dụng ở \textit{hai chặng} và ứng dụng không bao giờ nhận token Google (Sơ đồ~\ref{dia:oauth}).
+
+\begin{diagram}[!htbp]
+\centering
+\begin{tikzpicture}
+  \def\xa{0}\def\xb{4.5}\def\xc{9.2}\def\xd{13.4}
+  \node[seqhead,text width=2.3cm] at (\xa,0) {Ứng dụng\\(main process)};
+  \node[seqhead,text width=2.3cm] at (\xb,0) {Trình duyệt\\hệ thống};
+  \node[seqhead,text width=2.3cm] at (\xc,0) {voice-backend};
+  \node[seqhead,text width=2.3cm] at (\xd,0) {Google};
+  \foreach \x in {\xa,\xb,\xc,\xd} \draw[seqline] (\x,-0.48) -- (\x,-14.0);
+  \tntu[west]{1.3}{0.15}{1. Sinh code\_verifier,\\code\_challenge, state; mở\\cổng loopback 127.0.0.1}
+  \tn{2.95}{\xa}{\xc}{2. GET /auth/google/login\\(redirect\_uri, code\_challenge, state)}
+  \tntu{3.7}{\xc}{3. Kiểm tra redirect\_uri;\\lưu trạng thái (10 phút)}
+  \tnve{4.85}{\xc}{\xa}{4. 302 kèm URL đăng nhập Google (state mới, PKCE của backend)}
+  \tn{5.55}{\xa}{\xb}{5. Mở URL Google}
+  \tn{6.25}{\xb}{\xd}{6. Người dùng đăng nhập và đồng ý cấp quyền}
+  \tnve{6.95}{\xd}{\xb}{7. 302 về /auth/google/callback (state, code)}
+  \tn{7.65}{\xb}{\xc}{8. GET /auth/google/callback}
+  \tn{8.7}{\xc}{\xd}{9. Đổi code lấy token,\\đọc hồ sơ người dùng}
+  \tntu{9.45}{\xc}{10. Tạo/cập nhật người dùng; mã hóa token\\Google; sinh mã đăng nhập (120 giây)}
+  \tnve{10.95}{\xc}{\xb}{11. 302 về cổng loopback\\(mã đăng nhập, state)}
+  \tn{11.65}{\xb}{\xa}{12. GET /callback (mã, state)}
+  \tn{12.7}{\xa}{\xc}{13. POST /auth/token\\(mã đăng nhập, code\_verifier, redirect\_uri)}
+  \tnve{13.75}{\xc}{\xa}{14. Access token (JWT), refresh token, hồ sơ người dùng}
+\end{tikzpicture}
+\caption{Trình tự đăng nhập Google theo loopback và PKCE ở hai chặng}\label{dia:oauth}
+\nguon{Nhóm thiết kế, theo RFC 8252, RFC 7636 và mã nguồn hai phía.}
+\end{diagram}
+
+Các quy tắc kiểm tra chính:
+\begin{itemize}
+  \item \ma{redirect_uri} của ứng dụng phải thuộc danh sách cho phép hoặc là địa chỉ loopback (\ma{127.0.0.1}, \ma{localhost}, \ma{[::1]}); URL chứa thông tin đăng nhập, fragment hoặc cách viết IP bất thường bị từ chối.
+  \item \textit{state} dùng một lần; mã đăng nhập dùng một lần, gắn với \ma{redirect_uri} và \ma{code_challenge} ban đầu; xuất trình sai \textit{verifier} vẫn làm mã bị hủy.
+  \item Email Google chưa xác minh bị từ chối; không gộp vào tài khoản đã liên kết với một tài khoản Google khác.
+  \item Chỉ xin bốn quyền: \ma{openid}, \ma{email}, \ma{profile} và \ma{calendar.events}. Lịch chỉ chuyển sang chế độ Google khi Google thực sự cấp \ma{calendar.events} và trả refresh token; nếu không, đăng nhập vẫn thành công nhưng người dùng tiếp tục dùng lịch nội bộ.
+\end{itemize}
+
+\subsection{Phiên làm việc và thông tin xác thực Google}
+\begin{itemize}
+  \item \textbf{Access token} là JWT ký HS256, mặc định có hạn 15 phút, mang mã người dùng, nơi phát hành và đối tượng nhận; mỗi yêu cầu đều kiểm tra người dùng còn tồn tại.
+  \item \textbf{Refresh token} là chuỗi ngẫu nhiên, chỉ lưu dạng băm, mặc định có hạn 30 ngày và được xoay vòng mỗi lần dùng. Dùng lại một token đã xoay hoặc đã thu hồi — kể cả hai yêu cầu làm mới song song — bị coi là tái sử dụng và làm thu hồi toàn bộ chuỗi phiên.
+  \item \textbf{Token Google} được mã hóa AES-256-GCM với vectơ khởi tạo ngẫu nhiên cho mỗi lần mã hóa. Access token Google được làm mới khi còn dưới 60 giây; các yêu cầu đồng thời của cùng người dùng dùng chung một lần làm mới. Khi Google trả \ma{invalid_grant}, thông tin xác thực được đánh dấu thu hồi và mọi thao tác lịch trả mã \ma{GOOGLE_REAUTH_REQUIRED} cho đến khi người dùng đăng nhập Google lại.
+\end{itemize}
+Ứng dụng phân biệt hai loại 401: \ma{UNAUTHORIZED} (làm mới token phiên rồi thử lại) và \ma{GOOGLE_REAUTH_REQUIRED} (phải đăng nhập Google lại; làm mới token phiên không giải quyết được).
+
+\section{Thiết kế phân hệ lịch}
+Mọi thao tác lịch đi qua giao diện \textit{ICalendarService} gồm sáu phép: liệt kê, đọc, tạo, cập nhật, xóa sự kiện và tính khoảng bận. Một bộ phân giải chọn bản hiện thực theo người dùng:
+\begin{itemize}
+  \item \textbf{Dịch vụ Google:} thao tác trên lịch \ma{primary}; đọc theo trang (tối đa 250 sự kiện mỗi trang) với sự kiện lặp được trải thành từng lần; mỗi yêu cầu có hạn 10 giây. Lỗi 429, 5xx và lỗi 403 do vượt hạn mức được thử lại tối đa ba lần với thời gian chờ tăng theo lũy thừa hai cộng nhiễu ngẫu nhiên. Lỗi 401 khiến token được làm mới một lần và thao tác chạy lại; lỗi quyền dẫn tới \ma{GOOGLE_REAUTH_REQUIRED}. Thao tác tạo dùng mã sự kiện do backend chọn trước, nên khi thử lại mà Google trả “đã tồn tại” thì sự kiện đã lưu được trả về thay vì tạo trùng.
+  \item \textbf{Dịch vụ nội bộ:} lưu trong bảng \ma{local_events}; tìm kiếm không phân biệt hoa thường trên tiêu đề, mô tả, địa điểm.
+\end{itemize}
+Không có cơ chế âm thầm chuyển từ lịch Google sang lịch nội bộ: người dùng đã chọn Google mà mất quyền sẽ nhận lỗi yêu cầu đăng nhập lại, tránh tình trạng sự kiện bị ghi vào nơi người dùng không ngờ tới.
+
+Các quy tắc thời gian của sự kiện được tập trung ở một nơi: thời điểm kết thúc phải sau thời điểm bắt đầu; sự kiện cả ngày dùng ngày kết thúc không bao gồm; chỉ đổi giờ bắt đầu thì giữ nguyên thời lượng; chuyển đổi qua lại giữa sự kiện cả ngày và sự kiện có giờ theo quy tắc xác định. Phép tính khoảng bận gộp các khoảng chồng lấn hoặc liền kề, bỏ qua sự kiện đã hủy và sự kiện đánh dấu “rảnh”.
+
+\section{Thiết kế agent hiểu lệnh}\label{sec:nlu-design}
+\subsection{Tập ý định và cấu trúc kết quả trích xuất}
+Agent nhận diện tám ý định (Bảng~\ref{tab:intents}); hai ý định xác nhận và từ chối chỉ có nghĩa khi hội thoại đang có thao tác chờ.
+
+\begin{table}[!htbp]
+\caption{Tập ý định của agent}\label{tab:intents}
+\bang
+\begin{tabularx}{\textwidth}{|L{4.0cm}|Y|L{5.2cm}|}\hline
+\td{Ý định} & \td{Ý nghĩa} & \td{Ví dụ}\\\hline
+\ma{LIST_EVENTS} & Xem lịch trong một ngày/khoảng thời gian & “Ngày mai tôi có lịch gì?”\\\hline
+\ma{CREATE_EVENT} & Tạo sự kiện mới & “Chiều mai lúc 3 giờ họp với thầy hướng dẫn”\\\hline
+\ma{UPDATE_EVENT} & Dời giờ, đổi ngày hoặc đổi tên sự kiện & “Dời cuộc họp lúc 3 giờ chiều ngày mai sang 4 giờ”\\\hline
+\ma{DELETE_EVENT} & Xóa sự kiện & “Xóa lịch họp nhóm đồ án ngày mai”\\\hline
+\ma{CHECK_AVAILABILITY} & Hỏi rảnh/bận & “Chiều mai tôi có rảnh không?”\\\hline
+\ma{CONFIRM_ACTION}, \ma{REJECT_ACTION} & Trả lời cho thao tác đang chờ & “có”, “ok”, “xóa đi” / “không”, “thôi”\\\hline
+\ma{UNKNOWN} & Ngoài phạm vi & Trả lời kèm hướng dẫn các lệnh được hỗ trợ\\\hline
+\end{tabularx}
+\nguon{Nhóm thiết kế; các ví dụ đã được chạy thử trên hệ thống (Bảng~\ref{tab:dialog}).}
+\end{table}
+
+Mọi bộ trích xuất đều trả về cùng một cấu trúc \textit{ExtractedIntent}: loại ý định, độ tin cậy, ngôn ngữ, nguồn (\textit{rule} hoặc \textit{llm}); các trường cho việc tạo (tiêu đề, mô tả, địa điểm, thời điểm bắt đầu/kết thúc, thời lượng); các trường cho việc sửa/xóa (cụm từ nhận diện sự kiện, thời điểm của sự kiện hiện có, thời điểm đích, tên mới, độ dịch tương đối kiểu “lùi 30 phút”); và các dấu hiệu về \textit{độ chính xác thời gian} (người dùng nói rõ giờ, chỉ nói buổi, chỉ nói ngày, hay nói cả tuần). Nhờ các dấu hiệu này, bộ điều phối biết khi nào phải hỏi lại thay vì tự chọn giờ.
+
+\subsection{Bộ trích xuất lai}
+Chế độ trích xuất được cấu hình bằng biến \ma{INTENT_EXTRACTOR} với ba giá trị \textit{hybrid} (mặc định), \textit{rule}, \textit{llm}; khi không có khóa Gemini, hệ thống tự dùng bộ luật. Sơ đồ~\ref{dia:hybrid} mô tả chế độ lai.
+
+\begin{diagram}[!htbp]
+\centering
+\begin{tikzpicture}[node distance=0.5cm]
+  \node[hop,text width=7.0cm] (in) {Câu lệnh của người dùng + ngữ cảnh:\\thời điểm tham chiếu, múi giờ,\\thao tác đang chờ xác nhận (nếu có)};
+  \node[draw,diamond,aspect=3.2,align=center,font=\footnotesize,inner sep=0.5pt,below=of in,text width=4.6cm] (d1) {Có thao tác chờ và câu là\\lời xác nhận/từ chối ngắn?};
+  \node[hop,text width=7.0cm,below=of d1] (llm) {Gemini sinh JSON theo lược đồ,\\nhiệt độ 0, giới hạn 8 giây\\(kể cả mô hình dự phòng)};
+  \node[draw,diamond,aspect=3.2,align=center,font=\footnotesize,inner sep=0.5pt,below=of llm,text width=4.6cm] (d2) {Hợp lệ theo lược đồ và\\độ tin cậy từ 0,5 trở lên?};
+  \node[hopdam,text width=7.0cm,below=of d2] (out) {ExtractedIntent → bộ điều phối:\\kiểm tra nghiệp vụ, hỏi lại,\\yêu cầu xác nhận hoặc thực thi};
+  \node[hop,text width=3.2cm,right=2.7cm of d1] (rule1) {Bộ luật: quyết định\\xác nhận / từ chối};
+  \node[hop,text width=3.2cm,right=2.7cm of d2] (rule2) {Bộ luật tiếng Việt\\và tiếng Anh};
+  \draw[mui] (in) -- (d1);
+  \draw[mui] (d1) -- node[nhan,right=2pt]{không} (llm);
+  \draw[mui] (d1) -- node[nhan,above]{có} (rule1);
+  \draw[mui] (llm) -- (d2);
+  \draw[mui] (d2) -- node[nhan,right=2pt]{có} (out);
+  \draw[mui] (d2) -- node[nhan,above]{không, lỗi hoặc\\quá thời gian} (rule2);
+  \draw[mui] (rule2) |- (out);
+  \draw[mui] (rule1.east) -- ++(0.5,0) |- ([yshift=-2.5mm]out.east);
+\end{tikzpicture}
+\caption{Luồng trích xuất ý định theo chế độ lai}\label{dia:hybrid}
+\nguon{Nhóm thiết kế, theo mã nguồn mô-đun \texttt{agent/nlu}.}
+\end{diagram}
+
+Ba thành phần của chế độ lai:
+\begin{itemize}
+  \item \textbf{Bộ trích xuất LLM} gửi cho Gemini một lời nhắc hệ thống mô tả các ý định và quy tắc thời gian, kèm thời điểm hiện tại, thứ trong tuần (tiếng Việt và tiếng Anh) và múi giờ. Câu lệnh của người dùng được đưa vào như \textit{dữ liệu} (chuỗi JSON), kèm chỉ dẫn không làm theo bất kỳ yêu cầu nào nằm trong câu — một biện pháp giảm rủi ro chèn lệnh (prompt injection). Mô hình chỉ trả về ngày và giờ địa phương dạng \ma{YYYY-MM-DD} và \ma{HH:mm}; backend tự dựng lại thời điểm có múi giờ và đối chiếu với bộ phân tích tất định. Mô hình dự phòng chỉ được thử khi gặp lỗi 429, 404 hoặc 5xx.
+  \item \textbf{Bộ luật} gồm bước chuẩn hóa văn bản, từ điển từ khóa cho từng ý định (so khớp theo ranh giới từ, xử lý cả cách gõ có dấu và không dấu), ngữ pháp thời gian và bước tách các trường. Câu phủ định (“đừng xóa”) không bị hiểu thành lệnh xóa.
+  \item \textbf{Lời xác nhận ngắn} (tối đa sáu từ, ví dụ “có”, “ok”, “xóa đi”, “không”, “thôi”, “yes”, “cancel”) khi đang có thao tác chờ được quyết định trực tiếp bằng luật, không gọi LLM: nhanh, chính xác và không tốn hạn mức.
+\end{itemize}
+Nhật ký chỉ ghi lý do thất bại và mã trạng thái HTTP của lời gọi LLM, không ghi câu lệnh của người dùng.
+
+\subsection{Suy luận ngày giờ cho tiếng Việt}
+Ngữ pháp thời gian quét câu lệnh thành các \textit{thẻ thời gian} (ngày tuyệt đối, ngày tương đối, thứ trong tuần, khoảng tuần/tháng, giờ, buổi, thời lượng) rồi ghép chúng lại. Các quy tắc chính:
+\begin{itemize}
+  \item Một con số chỉ được coi là giờ khi đi kèm dấu hiệu tường minh: “lúc 3”, “3 giờ”, “15h”, “3h30”, “9:30”, “3 giờ rưỡi”, “3 giờ kém 15”, “3 chiều”. Số đứng sau các danh từ như \textit{thứ, ngày, mùng, tháng, phòng, tầng, số} không bao giờ là giờ.
+  \item Nhận diện ngày: “ngày 20/11”, “20 tháng 11 năm 2026”, “mùng 5”; “hôm nay”, “ngày mai”, “mốt”; “thứ sáu”, “thứ sáu tuần sau”; “tuần này”, “cuối tuần”, “tháng sau”. Ngày không ghi năm được hiểu là lần xuất hiện gần nhất sắp tới.
+  \item Giờ được chuyển sang hệ 24 giờ theo Bảng~\ref{tab:hours}; kết quả \textit{không phụ thuộc giờ hiện tại}, nên cùng một câu luôn cho cùng một kết quả.
+\end{itemize}
+
+\begin{table}[!htbp]
+\caption{Quy tắc diễn giải giờ nói thành giờ 24}\label{tab:hours}
+\bang
+\begin{tabularx}{\textwidth}{|L{4.3cm}|Y|L{4.2cm}|}\hline
+\td{Trường hợp} & \td{Quy tắc} & \td{Ví dụ}\\\hline
+Có buổi “sáng” (hoặc am) & Giữ nguyên; 12 giờ sáng là 0 giờ & 9 giờ sáng → 09:00\\\hline
+Có buổi “trưa” & 1–4 giờ cộng 12 & 1 giờ trưa → 13:00\\\hline
+Có buổi “chiều” (hoặc pm) & 1–11 giờ cộng 12 & 3 giờ chiều → 15:00\\\hline
+Có buổi “tối” & 1–11 giờ cộng 12; 12 giờ tối là 0 giờ hôm sau & 8 giờ tối → 20:00\\\hline
+Có buổi “đêm”, “khuya” & 6–11 giờ cộng 12; 12 giờ và 0–5 giờ thuộc ngày hôm sau & 2 giờ đêm → 02:00 hôm sau\\\hline
+Không nêu buổi & 1–6 giờ hiểu là buổi chiều (13–18 giờ); 7–12 giờ giữ nguyên; 13–23 giờ giữ nguyên & “lúc 3 giờ” → 15:00; “lúc 9 giờ” → 09:00\\\hline
+Viết có số 0 đứng đầu & Hiểu là ký pháp 24 giờ, giữ nguyên & “07h” → 07:00\\\hline
+Chỉ nêu buổi, không nêu giờ & Dùng giờ mặc định của buổi: sáng 9, trưa 12, chiều 14, tối 19, đêm 21 & “chiều mai” → 14:00 ngày mai\\\hline
+\end{tabularx}
+\nguon{Tệp \texttt{nlu/temporal/hours.ts} của backend.}
+\end{table}
+
+\subsection{Chính sách khi tạo sự kiện}
+\begin{itemize}
+  \item Không có cả ngày lẫn giờ: hỏi lại (ví dụ “Bạn muốn đặt lịch \ldots{} vào lúc nào?”).
+  \item Chỉ có ngày: đặt 9 giờ sáng ngày đó nếu thời điểm này còn ở phía trước, nếu không thì hỏi giờ.
+  \item Thời lượng mặc định 60 phút; các cuộc gọi, cà phê, đồng bộ nhanh mặc định 30 phút; nếu người dùng nêu giờ kết thúc hoặc thời lượng thì dùng giá trị đó.
+  \item Ngày rơi vào quá khứ (ví dụ nói “thứ hai này” vào thứ tư): hỏi lại người dùng muốn ngày nào, không tạo sự kiện trong quá khứ.
+  \item Thiếu tiêu đề: dùng tiêu đề mặc định theo ngôn ngữ của người dùng.
+\end{itemize}
+
+\subsection{Xác định sự kiện mục tiêu khi sửa và xóa}
+Sửa và xóa đòi hỏi tìm đúng \textit{một} sự kiện hiện có. Bộ tìm mục tiêu hoạt động như sau:
+\begin{enumerate}
+  \item \textbf{Xác định cửa sổ tìm kiếm:} ±120 phút quanh thời điểm người dùng nêu rõ; nếu không thì ngày, buổi hoặc khoảng thời gian được nêu; nếu không có thông tin thời gian thì 30 ngày tới tính từ hiện tại. Không bao giờ quét về quá khứ xa để lấy “sự kiện cũ nhất”.
+  \item \textbf{Chấm điểm ứng viên:} theo số từ nội dung của cụm nhận diện xuất hiện trong tiêu đề (trọng số 1), địa điểm (0,8), mô tả (0,6), cộng độ gần về thời gian. Dấu tiếng Việt được so sánh khi cả hai phía đều có dấu và bỏ qua khi một phía không dấu; các từ chung chung như “cuộc”, “họp”, “meeting” chỉ dùng để xếp hạng.
+  \item \textbf{Quyết định:} chỉ tác động khi có đúng một ứng viên khớp đầy đủ và cách biệt rõ với ứng viên kế tiếp. Nếu hai ứng viên có điểm sát nhau (chênh dưới 0,15), hoặc người dùng chỉ nêu ngày, hệ thống liệt kê tối đa năm ứng viên để người dùng chọn. Khớp một phần hoặc chỉ khớp khi bỏ dấu thì chỉ được \textit{đề xuất}, không tự thay đổi. Không có tên lẫn thời gian thì hỏi lại; không tìm thấy thì báo rõ.
+\end{enumerate}
+Kế hoạch cập nhật giữ nguyên thời lượng trừ khi người dùng nêu giờ kết thúc; đích chỉ có giờ thì giữ nguyên ngày của sự kiện; hỗ trợ dịch tương đối; phát hiện khoảng thời gian không hợp lệ.
+
+\section{Quản lý hội thoại và xác nhận thao tác}\label{sec:dialog-design}
+Mỗi câu lệnh thuộc về một \textit{hội thoại}. Nếu yêu cầu không kèm mã hội thoại, hệ thống tạo hội thoại mới với tiêu đề lấy từ câu đầu tiên. Tin nhắn của người dùng, câu trả lời của trợ lý và thao tác chờ (nếu có) được ghi trong \textit{một giao dịch} cơ sở dữ liệu dưới khóa hàng của hội thoại, bảo đảm thứ tự nhất quán khi có yêu cầu đồng thời. Ngôn ngữ trả lời được chọn theo thứ tự: tham số của yêu cầu → cài đặt người dùng → ngôn ngữ phát hiện từ câu lệnh.
+
+Khi tìm được đúng một sự kiện cho lệnh sửa/xóa và người dùng không tắt yêu cầu xác nhận, hệ thống không thực thi ngay mà tạo một \textit{thao tác chờ xác nhận} (Sơ đồ~\ref{dia:pending}) rồi trả về câu hỏi kèm mô tả sự kiện và thay đổi đề xuất.
+
+\begin{diagram}[!htbp]
+\centering
+\begin{tikzpicture}
+  \node[trangthai,minimum height=4.5cm,minimum width=2.7cm] (p) at (0,0) {\textbf{pending}\\(chờ xác nhận)};
+  \node[trangthai,minimum width=3.0cm] (c) at (10.7,1.65)  {\textbf{confirmed}\\(đã áp dụng)};
+  \node[trangthai,minimum width=3.0cm] (r) at (10.7,0)     {\textbf{rejected}\\(đã hủy)};
+  \node[trangthai,minimum width=3.0cm] (e) at (10.7,-1.65) {\textbf{expired}\\(hết hiệu lực)};
+  \fill (-3.05,0) circle (0.11);
+  \draw[mui] (-2.94,0) -- node[nhan,above]{tạo đề xuất} (p.west);
+  \draw[mui] (p.east|-c) -- node[nhan,above]{xác nhận bằng nút hoặc lời “có”, khi còn hạn} (c.west);
+  \draw[mui] (p.east|-r) -- node[nhan,above]{từ chối bằng nút hoặc lời “không”} (r.west);
+  \draw[mui] (p.east|-e) -- node[nhan,above]{quá 300 giây, có đề xuất mới hoặc hội thoại bị xóa} (e.west);
+  \draw[mui,dashed] (c.north) -- ++(0,0.85) -| node[nhan,above,pos=0.25]{ghi lên lịch thất bại: mở lại để người dùng thử lại} (p.north);
+\end{tikzpicture}
+\caption{Vòng đời của một thao tác chờ xác nhận}\label{dia:pending}
+\nguon{Nhóm thiết kế, theo mã nguồn mô-đun \texttt{agent}.}
+\end{diagram}
+
+Các tính chất của cơ chế xác nhận:
+\begin{itemize}
+  \item \textbf{Một thao tác chờ cho mỗi hội thoại:} đề xuất mới làm hết hiệu lực đề xuất cũ; lời xác nhận chỉ có giá trị trong chính hội thoại đã hỏi.
+  \item \textbf{Thực thi đúng một lần:} việc chuyển trạng thái \textit{pending} sang \textit{confirmed}/\textit{rejected} là một phép so-sánh-rồi-gán nguyên tử trong cơ sở dữ liệu và chỉ thành công khi còn hạn; hai lời xác nhận đồng thời chỉ dẫn tới một lần ghi lên lịch.
+  \item \textbf{Kiểm tra lại trước khi ghi:} khi xác nhận, sự kiện được đọc lại; nếu sự kiện không còn tồn tại (hoặc người dùng đã đổi nguồn lịch) thì báo rõ và không thực hiện.
+  \item \textbf{Phục hồi khi lỗi:} nếu việc ghi lên lịch thất bại, thao tác được mở lại để người dùng thử lại, ví dụ sau khi đăng nhập Google lại.
+  \item \textbf{Hai cách xác nhận tương đương:} bấm nút (gọi API xác nhận theo mã thao tác) hoặc trả lời bằng lời/gõ “có”, “không” trong cùng hội thoại.
+\end{itemize}
+Lịch sử hội thoại được truy vấn theo phân trang con trỏ (keyset), mới nhất trước; xóa hội thoại sẽ làm hết hiệu lực các thao tác chờ của nó.
+
+\section{Thiết kế phân hệ giọng nói}
+\subsection{Nhận dạng tiếng nói}
+Bộ STT được chọn bằng biến \ma{STT_PROVIDER}: \textit{gemini}, \textit{mock} (chỉ cho phát triển và kiểm thử, bị cấm ở production) hoặc \textit{none}. Yêu cầu nhận dạng được kiểm tra theo thứ tự: bộ STT khả dụng (nếu không trả 503) → âm thanh hợp lệ. Âm thanh rỗng trả lỗi 400; vượt 10 MB sau giải mã trả 413; kiểu tệp được chuẩn hóa và nếu thiếu thì được đoán từ các byte đầu tệp; chấp nhận WAV, WebM, Ogg, MP3, MP4 và FLAC, còn lại trả 415. Tệp WAV được phân tích tiêu đề để tính thời lượng.
+
+Bộ STT Gemini gửi âm thanh kèm lời nhắc yêu cầu chép nguyên văn và \textit{không dịch}, nhiệt độ 0; toàn bộ các lần thử (kể cả mô hình dự phòng) dùng chung một ngân sách 30 giây. Đoạn im lặng cho kết quả rỗng và không kích hoạt agent. Khác với nguyên mẫu ban đầu, khi STT lỗi hệ thống \textit{không} chuyển sang bộ giả lập mà trả lỗi rõ ràng.
+
+\subsection{Tổng hợp tiếng nói}
+Giọng đọc được chọn theo thứ tự: giọng nêu trong yêu cầu → giọng người dùng đã lưu → giọng mặc định của máy chủ → giọng tiếng Việt đầu tiên tìm thấy. Văn bản được làm sạch các ký hiệu định dạng trước khi đọc và giới hạn 1000 ký tự mỗi yêu cầu (ứng dụng tự chia nhỏ ở mức 900 ký tự).
+
+Piper được chạy như tiến trình con với các biện pháp an toàn: không qua shell; văn bản truyền qua luồng nhập chuẩn chứ không qua tham số dòng lệnh; biến môi trường theo danh sách cho phép; mã giọng đọc chỉ được so khớp với các mô hình đã quét thấy trong thư mục mô hình (không biến dữ liệu từ client thành đường dẫn); tệp kết quả tạm có tên ngẫu nhiên và luôn bị xóa; quá 15 giây thì tiến trình bị buộc dừng; số tiến trình đồng thời bị giới hạn bằng semaphore (mặc định 2). Khi TTS không khả dụng, API trả 503 thay vì phát âm thanh thay thế.
+
+\section{Thiết kế kênh thời gian thực}\label{sec:realtime-design}
+Bên cạnh API REST, backend cung cấp kênh WebSocket tại \ma{/api/v1/ws} để một yêu cầu duy nhất nhận về lần lượt trạng thái xử lý, bản chép, kết quả và âm thanh của từng câu. Kênh chỉ nhận khung văn bản JSON; mọi khung được kiểm tra bằng lược đồ (Bảng~\ref{tab:ws-frames}). Sơ đồ~\ref{dia:ws-seq} minh họa thứ tự các khung của một lệnh giọng nói.
+
+\begin{table}[!htbp]
+\caption{Các loại khung của giao thức WebSocket}\label{tab:ws-frames}
+\bang
+\begin{tabularx}{\textwidth}{|L{2.4cm}|L{2.6cm}|Y|}\hline
+\td{Chiều} & \td{Loại khung} & \td{Nội dung}\\\hline
+\multirow{6}{=}{Client → máy chủ} & \ma{auth} & Access token; dùng cho xác thực ban đầu và xác thực lại khi token hết hạn.\\\cline{2-3}
+ & \ma{command} & Lệnh văn bản: mã yêu cầu, nội dung, ngôn ngữ, mã hội thoại, múi giờ, tùy chọn giọng đọc.\\\cline{2-3}
+ & \ma{voice_command} & Lệnh giọng nói: âm thanh mã hóa base64 và các tham số như trên.\\\cline{2-3}
+ & \ma{confirm}, \ma{reject} & Xác nhận hoặc hủy thao tác đang chờ theo mã thao tác.\\\cline{2-3}
+ & \ma{cancel} & Hủy yêu cầu đang chạy.\\\cline{2-3}
+ & \ma{ping} & Kiểm tra kết nối ở tầng ứng dụng.\\\hline
+\multirow{7}{=}{Máy chủ → client} & \ma{ready} & Xác thực thành công.\\\cline{2-3}
+ & \ma{status} & Trạng thái của yêu cầu: \textit{transcribing, thinking, speaking, idle}.\\\cline{2-3}
+ & \ma{transcript} & Kết quả nhận dạng tiếng nói.\\\cline{2-3}
+ & \ma{result} & Phản hồi của agent (cùng cấu trúc với API REST).\\\cline{2-3}
+ & \ma{chunk} & Một câu của câu trả lời, có chỉ số và cờ câu cuối.\\\cline{2-3}
+ & \ma{audio} & Âm thanh WAV của câu có cùng chỉ số.\\\cline{2-3}
+ & \ma{error}, \ma{pong} & Lỗi có mã; trả lời \ma{ping}.\\\hline
+\end{tabularx}
+\nguon{Tệp \texttt{realtime/protocol.ts} của backend.}
+\end{table}
+
+\begin{diagram}[!htbp]
+\centering
+\begin{tikzpicture}
+  \def\xa{0}\def\xb{9.0}
+  \node[seqhead,text width=2.6cm] at (\xa,0) {Client};
+  \node[seqhead,text width=2.6cm] at (\xb,0) {voice-backend};
+  \foreach \x in {\xa,\xb} \draw[seqline] (\x,-0.48) -- (\x,-8.85);
+  \tn{1.05}{\xa}{\xb}{auth \{token\}}
+  \tnve{1.65}{\xb}{\xa}{ready \{userId\}}
+  \tn{2.25}{\xa}{\xb}{voice\_command \{id, audioBase64, tts\}}
+  \tnve{2.85}{\xb}{\xa}{status: transcribing}
+  \tnve{3.45}{\xb}{\xa}{transcript \{văn bản, ngôn ngữ, độ trễ STT\}}
+  \tnve{4.05}{\xb}{\xa}{status: thinking}
+  \tnve{4.65}{\xb}{\xa}{result \{phản hồi của agent\}}
+  \tnve{5.25}{\xb}{\xa}{status: speaking}
+  \tnve{5.85}{\xb}{\xa}{chunk 0 \{câu thứ nhất\} + audio 0 \{WAV\}}
+  \tnve{6.45}{\xb}{\xa}{chunk 1 \{câu thứ hai, isFinal\} + audio 1 \{WAV\}}
+  \tnve{7.05}{\xb}{\xa}{status: idle}
+  \tn{7.85}{\xa}{\xb}{confirm \{id, actionId\} (nếu có thao tác chờ)}
+  \tnve{8.45}{\xb}{\xa}{status: thinking → result → \ldots{} → status: idle}
+\end{tikzpicture}
+\caption{Thứ tự khung của một lệnh giọng nói trên kênh WebSocket}\label{dia:ws-seq}
+\nguon{Nhóm thiết kế, theo tài liệu giao thức của backend.}
+\end{diagram}
+
+Các quy tắc của giao thức:
+\begin{itemize}
+  \item \textbf{Xác thực:} bằng tiêu đề khi nâng cấp kết nối hoặc khung \ma{auth} đầu tiên trong vòng 10 giây. Trước khi xác thực, tầng truyền chỉ nhận khung tối đa 16 KiB, nên client phải chờ \ma{ready} rồi mới gửi âm thanh. Khi token hết hạn giữa chừng, yêu cầu mới bị từ chối bằng khung lỗi nhưng kết nối được giữ để client gửi lại \ma{auth}.
+  \item \textbf{Một yêu cầu tại một thời điểm} trên mỗi kết nối; yêu cầu thứ hai nhận lỗi \ma{BUSY}. \ma{cancel} làm máy chủ gửi ngay trạng thái \textit{idle} và bỏ các khung còn lại của yêu cầu.
+  \item \textbf{Tách câu:} câu trả lời được tách thành từng câu, giữ nguyên giờ, số thập phân, ngày tháng, URL và chữ viết tắt; mỗi dòng của danh sách là một khung riêng. Lỗi tổng hợp giọng chỉ sinh một khung lỗi; các câu còn lại vẫn được gửi dạng văn bản.
+  \item \textbf{Giới hạn:} 60 khung yêu cầu mỗi phút cho mỗi người dùng, riêng lệnh giọng nói 30 khung mỗi phút; khung sau xác thực tối đa khoảng 13,4 MB với cấu hình mặc định; máy chủ gửi ping giao thức mỗi 30 giây và ngắt kết nối không phản hồi.
+\end{itemize}
+Điểm cuối \texttt{POST /voice/command} cung cấp cùng chuỗi xử lý (nhận dạng → agent → giọng đọc) trong một yêu cầu HTTP cho các client không dùng WebSocket. Ở thời điểm báo cáo, kênh WebSocket đã được hiện thực và kiểm thử ở backend; việc chuyển ứng dụng desktop từ ba lời gọi REST sang kênh này nằm trong kế hoạch giai đoạn cuối.
+
+\section{Thiết kế bảo mật và quyền riêng tư}\label{sec:security-design}
+Bảng~\ref{tab:security} tổng hợp các rủi ro chính đã được xét tới và biện pháp tương ứng trong thiết kế.
+
+\FloatBarrier
+{\bang
+\begin{longtable}{|L{4.2cm}|L{10.9cm}|}
+\caption{Các rủi ro chính và biện pháp trong thiết kế}\label{tab:security}\\\hline
+\td{Rủi ro} & \td{Biện pháp}\\\hline
+\endfirsthead
+\hline\td{Rủi ro} & \td{Biện pháp}\\\hline
+\endhead
+Lộ khóa API, client secret khi phân phối ứng dụng & Toàn bộ bí mật nằm ở backend; ứng dụng chỉ đọc địa chỉ backend từ cấu hình.\\\hline
+Lộ token Google khi cơ sở dữ liệu bị đọc trộm & Mã hóa AES-256-GCM bằng khóa nằm ngoài cơ sở dữ liệu; token phiên, mã đăng nhập và \textit{state} chỉ lưu dạng băm.\\\hline
+Chặn mã ủy quyền, giả mạo chuyển hướng & PKCE S256 ở hai chặng; \textit{state} và mã đăng nhập dùng một lần, có thời hạn ngắn; kiểm tra chặt \ma{redirect_uri}.\\\hline
+Đánh cắp refresh token & Xoay vòng mỗi lần dùng; phát hiện tái sử dụng và thu hồi cả chuỗi phiên.\\\hline
+Tiến trình giao diện bị chèn mã & Cô lập ngữ cảnh; renderer không giữ token; tiến trình chính chỉ xử lý các kênh IPC trong hợp đồng; chặn điều hướng ra ngoài.\\\hline
+Lạm dụng, dò quét API & Giới hạn tần suất: toàn cục 120 yêu cầu/phút; nhóm xác thực 20/phút theo IP; nhóm giọng nói 30/phút; lệnh agent 60/phút; WebSocket có hạn mức riêng.\\\hline
+Sửa/xóa nhầm do nhận dạng hoặc hiểu sai & Xác nhận bắt buộc (mặc định), thao tác chờ có thời hạn, hỏi lại khi mơ hồ, không tác động khi chỉ khớp một phần.\\\hline
+Chèn lệnh qua câu nói (prompt injection) & Câu lệnh được đưa vào LLM như dữ liệu; đầu ra bị ràng buộc bởi lược đồ và được kiểm tra lại; LLM không có quyền gọi dịch vụ lịch.\\\hline
+Lộ dữ liệu qua nhật ký và thông báo lỗi & Che token, mã, âm thanh trong nhật ký; không ghi chuỗi truy vấn của URL; bản chép chỉ ghi ở mức gỡ lỗi; lỗi 5xx trả thông điệp chung chung.\\\hline
+Thực thi lệnh hệ thống qua TTS & Chạy Piper không qua shell, văn bản qua luồng nhập chuẩn, mã giọng đọc đối chiếu danh sách mô hình, có thời gian chờ và giới hạn số tiến trình.\\\hline
+Truy cập dữ liệu của người khác & Mọi truy vấn gắn mã người dùng; tài nguyên của người khác trả 404.\\\hline
+\end{longtable}}
+\nguon{Nhóm tổng hợp từ thiết kế và mã nguồn backend.}
+
+\section{Kết luận chương}
+Chương 3 đã trình bày yêu cầu và thiết kế của hệ thống theo kiến trúc client mỏng – backend: ứng dụng desktop đảm nhiệm thu âm, VAD và trình bày; backend đảm nhiệm xác thực, lịch, hiểu lệnh, hội thoại và giọng nói. Hai điểm nhấn của thiết kế là bộ trích xuất ý định lai có phương án dự phòng tất định và cơ chế thao tác chờ xác nhận bảo đảm thao tác ghi an toàn. Chương 4 trình bày việc hiện thực và kết quả kiểm thử.

@@ -1,12 +1,20 @@
 \unnumchapter{BẢNG PHÂN CÔNG NHIỆM VỤ NHÓM THỰC HIỆN}
+% CẦN NHÓM RÀ LẠI: nội dung phân công dưới đây được soạn dựa trên lịch sử commit của hai kho mã;
+% hãy chỉnh cho đúng với phân công thực tế trước khi nộp.
 
-Bảng dưới đây ghi nhận phương án phân công sơ bộ cho giai đoạn khảo sát và thiết kế. Nhóm cần rà soát bảng này với tiến độ và phân công thực tế trước khi nộp bản chính thức.
+Bảng dưới đây ghi nhận nhiệm vụ được giao và công việc mỗi thành viên đã thực hiện tính đến báo cáo định kỳ lần 2.
 
-\renewcommand{\arraystretch}{1.2}
-\noindent\begin{tabular}{|>{\raggedright\arraybackslash}p{3.5cm}|>{\raggedright\arraybackslash}p{3.2cm}|>{\raggedright\arraybackslash}p{7.9cm}|}\hline
-\textbf{Mã SV – Họ tên} & \textbf{Luồng công việc dự kiến} & \textbf{Phạm vi phối hợp}\\\hline
-\MaSVMot{} – \TenSVMot & Nghiên cứu pipeline giọng nói & Tổng hợp VAD, wake word, STT/TTS; xây dựng bộ câu lệnh và các tình huống kiểm thử nhận dạng, ý định, thời gian.\\\hline
-\MaSVHai{} – \TenSVHai & Nghiên cứu nghiệp vụ lịch & Phân tích OAuth, Google Calendar API, mô hình sự kiện, luồng tạo/cập nhật/xóa và cách xử lý lỗi dịch vụ.\\\hline
-Cả hai thành viên & Phân tích và thiết kế & Thống nhất phạm vi, yêu cầu, kiến trúc desktop, quy tắc xác nhận, đánh giá lựa chọn công nghệ và hoàn thiện báo cáo.\\\hline
-\end{tabular}
+{\bang
+\noindent\begin{tabularx}{\textwidth}{|C{0.8cm}|L{3.0cm}|L{3.6cm}|Y|}\hline
+\td{STT} & \td{Họ tên – Mã SV} & \td{Nhiệm vụ được giao} & \td{Công việc đã thực hiện}\\\hline
+1 & \TenSVMot\newline \MaSVMot &
+Ứng dụng desktop và pipeline giọng nói phía người dùng &
+Khảo sát VAD, từ khóa đánh thức, STT, TTS và kiến trúc streaming. Xây dựng nguyên mẫu ứng dụng Electron: thu âm microphone, phát hiện tiếng nói bằng Silero VAD, hàng đợi phát giọng đọc theo từng câu, bộ đo độ trễ theo giai đoạn và giao diện hội thoại. Viết các bộ kiểm thử của pipeline giọng nói phía ứng dụng; biên soạn và trình bày quyển báo cáo.\\\hline
+2 & \TenSVHai\newline \MaSVHai &
+Dịch vụ phía máy chủ và nghiệp vụ lịch &
+Thiết kế và hiện thực \textit{voice-backend}: đăng nhập Google theo OAuth 2.0 (loopback + PKCE), quản lý phiên và token; phân hệ lịch (Google Calendar và lịch nội bộ); agent hiểu lệnh tiếng Việt/tiếng Anh với cơ chế hỏi lại và xác nhận; nhận dạng và tổng hợp tiếng nói; kênh WebSocket; cơ sở dữ liệu và đóng gói Docker. Chuyển ứng dụng desktop sang mô hình client mỏng gọi backend; xây dựng bộ kiểm thử đơn vị, tích hợp và đầu-cuối.\\\hline
+3 & Cả nhóm &
+Phân tích, thiết kế, đánh giá &
+Thống nhất phạm vi, yêu cầu và kiến trúc; rà soát mã nguồn nguyên mẫu và lập danh sách lỗi cần khắc phục; chạy kiểm thử đầu-cuối, thu thập kết quả; hoàn thiện nội dung báo cáo định kỳ lần 2.\\\hline
+\end{tabularx}}
 \clearpage

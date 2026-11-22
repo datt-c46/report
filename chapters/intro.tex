@@ -1,17 +1,44 @@
 \unnumchapter{MỞ ĐẦU}
+\newcommand{\mucmodau}[1]{\par\vspace{4pt}{\bfseries #1}\par\nopagebreak}
 
-\textbf{Lý do chọn đề tài.}
-Lịch làm việc là dữ liệu có cấu trúc nhưng người dùng thường diễn đạt yêu cầu bằng ngôn ngữ tự nhiên, chẳng hạn “nhắc tôi họp nhóm lúc ba giờ chiều thứ sáu”. Để biến câu nói thành một sự kiện lịch chính xác, ứng dụng phải nhận được tiếng nói, hiểu được ý định, chuẩn hóa thời gian theo múi giờ và chỉ ghi dữ liệu sau khi các thông tin cần thiết đã rõ. Đây là bài toán liên ngành, kết hợp xử lý tiếng nói, quản lý hội thoại, tích hợp dịch vụ web và thiết kế ứng dụng desktop. Đề tài tập trung khảo sát và xây dựng một trợ lý chạy thường trú trên máy tính, kết nối Google Calendar, đồng thời chú trọng quyền riêng tư, khả năng xử lý lỗi và tính dễ kiểm chứng của từng thao tác.
+\mucmodau{1. Lý do chọn đề tài}
+Lịch làm việc là dữ liệu có cấu trúc, nhưng người dùng thường diễn đạt yêu cầu bằng ngôn ngữ tự nhiên, chẳng hạn “chiều mai lúc ba giờ họp với thầy hướng dẫn” hay “dời cuộc họp đó sang bốn giờ”. Để biến một câu nói thành thao tác chính xác trên lịch, hệ thống phải thu được tiếng nói, nhận dạng thành văn bản, hiểu ý định, chuẩn hóa thời gian theo múi giờ, xác định đúng sự kiện cần tác động và chỉ ghi dữ liệu khi thông tin đã rõ ràng. Đây là bài toán liên ngành, kết hợp xử lý tiếng nói, hiểu ngôn ngữ tự nhiên, quản lý hội thoại, tích hợp dịch vụ web và thiết kế ứng dụng desktop.
 
-\textbf{Mục đích nghiên cứu.}
-Mục tiêu của đề tài là đề xuất và xây dựng nguyên mẫu trợ lý giọng nói hỗ trợ người dùng tra cứu và quản lý sự kiện Google Calendar bằng tiếng Việt. Báo cáo định kỳ lần 1 tập trung xác định bài toán, khảo sát nền tảng kỹ thuật, mô tả quy trình nghiệp vụ và xây dựng thiết kế ban đầu; chưa trình bày kết quả đo hiệu năng hay khẳng định sản phẩm đã triển khai hoàn chỉnh.
+Các trợ lý ảo thương mại có hỗ trợ lệnh lịch nhưng gắn chặt với hệ sinh thái của nhà cung cấp và người dùng không kiểm soát được cách xử lý dữ liệu. Phạm vi tính năng của chúng cũng thay đổi theo chiến lược sản phẩm: năm 2024 Google loại bỏ 17 tính năng của Google Assistant, trong đó có việc dời sự kiện Google Calendar bằng giọng nói \cite{tcassistant}, và đang chuyển dần trải nghiệm trợ lý sang Gemini \cite{ninetofive}. Trong khi đó, các thành phần mã nguồn mở và dịch vụ đám mây cho từng khâu (phát hiện tiếng nói, nhận dạng, mô hình ngôn ngữ lớn, tổng hợp tiếng nói) đã đủ trưởng thành để ghép thành một trợ lý chuyên biệt. Vì vậy nhóm chọn đề tài xây dựng trợ lý giọng nói trên máy tính, hỗ trợ tiếng Việt, tương tác với Google Calendar, chú trọng tính an toàn của thao tác ghi, quyền riêng tư và khả năng kiểm chứng từng khâu xử lý.
 
-\textbf{Tình hình nghiên cứu.}
-Các trợ lý số hiện nay kết hợp nhận dạng tiếng nói, hiểu ngôn ngữ tự nhiên và dịch vụ lịch; các hệ sinh thái thương mại thường tích hợp sẵn phần cứng, tài khoản và dịch vụ của nhà cung cấp. Ở hướng xây dựng ứng dụng riêng, các thành phần như Whisper cho nhận dạng tiếng nói, các bộ phát hiện từ khóa đánh thức, Electron cho ứng dụng desktop và Google Calendar API có thể được ghép thành một quy trình chuyên biệt. Thách thức của đề tài không chỉ là nối các thành phần mà còn nằm ở việc xử lý cách nói tiếng Việt đa dạng, thời gian tương đối, lệnh thiếu thông tin, phản hồi lỗi API và tránh tạo hoặc sửa nhầm sự kiện. Vì vậy, nhóm chọn cách thiết kế theo mô-đun và đánh giá từng khâu trước khi tích hợp toàn bộ \cite{radford2022whisper,gcalapi,electron}.
+\mucmodau{2. Mục đích nghiên cứu}
+Mục tiêu tổng quát là thiết kế và xây dựng trợ lý Voice Agent chạy trên máy tính, cho phép người dùng tra cứu và quản lý sự kiện Google Calendar bằng lệnh giọng nói hoặc văn bản tiếng Việt (có hỗ trợ tiếng Anh). Các mục tiêu cụ thể gồm:
+\begin{itemize}
+  \item Nghiên cứu các khâu của một trợ lý giọng nói: VAD, từ khóa đánh thức, STT, hiểu ý định và trích xuất thực thể, suy luận ngày giờ, quản lý hội thoại, TTS, truyền dữ liệu thời gian thực và kỹ thuật đo độ trễ.
+  \item Xây dựng ứng dụng desktop thu âm, phát hiện tiếng nói ngay trên máy, hiển thị hội thoại và phát giọng đọc phản hồi.
+  \item Xây dựng dịch vụ phía máy chủ đảm nhiệm đăng nhập Google theo OAuth 2.0, thao tác Google Calendar, hiểu lệnh tiếng Việt/tiếng Anh, nhận dạng và tổng hợp tiếng nói; bảo đảm mọi khóa bí mật và token nằm ngoài ứng dụng phía người dùng.
+  \item Thiết kế cơ chế hội thoại an toàn: hỏi lại khi thiếu hoặc mơ hồ thông tin, yêu cầu xác nhận trước khi sửa/xóa, không báo thành công khi dịch vụ lịch chưa xác nhận.
+  \item Xây dựng bộ kiểm thử tự động ở mức đơn vị, tích hợp và đầu-cuối để kiểm chứng từng phân hệ và toàn bộ luồng xử lý.
+\end{itemize}
 
-\textbf{Phạm vi và phương pháp nghiên cứu.}
-Phạm vi nguyên mẫu là ứng dụng desktop, ưu tiên môi trường Windows và lệnh tiếng Việt, tích hợp một tài khoản Google Calendar do người dùng ủy quyền. Các thao tác dự kiến gồm xem lịch, tạo sự kiện, tìm sự kiện và cập nhật hoặc xóa sau khi xác định đúng sự kiện. Những chức năng như nhiều nhà cung cấp lịch, ứng dụng di động, tự gửi thư mời, xử lý mọi biến thể tiếng nói hoặc quản lý chuỗi sự kiện lặp lại không thuộc phạm vi tối thiểu ban đầu. Nhóm nghiên cứu tài liệu chuẩn và tài liệu nhà cung cấp, phân tích tình huống sử dụng, xây dựng nguyên mẫu theo từng mô-đun, sau đó kiểm thử bằng các câu lệnh mẫu có đáp án mong đợi. Các lựa chọn công nghệ và giới hạn nêu trong báo cáo là thiết kế ban đầu, cần được kiểm chứng bằng nguyên mẫu.
+\mucmodau{3. Tình hình nghiên cứu}
+Trợ lý ảo đang chuyển từ kiến trúc “ý định – khe thông tin” truyền thống sang kiến trúc dựa trên mô hình ngôn ngữ lớn (LLM). Ở từng khâu kỹ thuật, nhiều kết quả đã được công bố và mở mã nguồn: Whisper cho nhận dạng tiếng nói đa ngôn ngữ \cite{radford2022whisper} và PhoWhisper tinh chỉnh riêng cho tiếng Việt \cite{phowhisper}; Silero VAD cho phát hiện tiếng nói với mô hình nhỏ chạy được trên CPU \cite{silero}; openWakeWord và Porcupine cho từ khóa đánh thức \cite{openwakeword,porcupine}; Piper, dựa trên kiến trúc VITS, cho tổng hợp tiếng nói cục bộ \cite{vits,piper}; các LLM hỗ trợ đầu ra có cấu trúc theo lược đồ JSON \cite{geministructured}. Tuy nhiên, việc ghép các thành phần này thành một trợ lý lịch tiếng Việt đáng tin cậy vẫn đặt ra nhiều vấn đề: cách nói thời gian tiếng Việt đa dạng (“3 giờ kém 15 chiều mốt”, “thứ sáu tuần sau”), con số trong câu không phải lúc nào cũng là giờ, tên sự kiện trùng hoặc gần giống nhau, và rủi ro sửa/xóa nhầm khi nhận dạng sai. Đề tài tập trung vào các vấn đề tích hợp và an toàn thao tác này thay vì huấn luyện mô hình mới. Phần khảo sát chi tiết được trình bày ở Chương~\ref{ch:intro}.
 
-\textbf{Kết cấu của đề tài.}
-Ngoài phần Mở đầu, báo cáo gồm bốn chương: Chương 1 giới thiệu đề tài và phạm vi; Chương 2 trình bày nền tảng lý thuyết; Chương 3 phân tích yêu cầu, nghiệp vụ và thiết kế ban đầu; Chương 4 nêu kế hoạch triển khai và phương pháp kiểm thử; cuối cùng là phần Kết luận, kiến nghị.
+\mucmodau{4. Đối tượng và phạm vi nghiên cứu}
+\textit{Đối tượng nghiên cứu} gồm quy trình xử lý một câu lệnh giọng nói từ microphone đến thao tác trên lịch; các kỹ thuật VAD, STT, NLU, suy luận thời gian, TTS; giao thức OAuth 2.0 và Google Calendar API; kiến trúc ứng dụng desktop Electron và dịch vụ web phía máy chủ.
+
+\textit{Phạm vi} của sản phẩm đến báo cáo định kỳ lần 2: ứng dụng desktop một cửa sổ; lệnh tiếng Việt và tiếng Anh; năm nhóm thao tác lịch (xem, tạo, sửa/dời, xóa, kiểm tra lịch trống) trên lịch chính của tài khoản Google hoặc trên lịch nội bộ lưu ở máy chủ; phát hiện tiếng nói chạy trên máy người dùng; nhận dạng tiếng nói và mô hình ngôn ngữ dùng dịch vụ Gemini, tổng hợp tiếng nói dùng Piper chạy trên máy chủ. Từ khóa đánh thức, chế độ chạy nền ở khay hệ thống, bộ nhớ hội thoại dài hạn, sự kiện lặp và người tham dự chưa thuộc phần đã hiện thực (xem mục~\ref{sec:limits}).
+
+\mucmodau{5. Phương pháp nghiên cứu}
+\begin{itemize}
+  \item \textit{Nghiên cứu tài liệu:} các chuẩn RFC về OAuth 2.0, PKCE, JWT, WebSocket; tài liệu của Google Calendar API, Gemini API, Electron; các công trình về VAD, ASR, TTS.
+  \item \textit{Phân tích và thiết kế:} xác định tác nhân, ca sử dụng, yêu cầu; thiết kế kiến trúc theo mô-đun với giao diện rõ ràng để từng thành phần (STT, TTS, bộ trích xuất ý định, dịch vụ lịch) có thể thay thế và kiểm thử độc lập.
+  \item \textit{Xây dựng nguyên mẫu và cải tiến lặp:} hiện thực nguyên mẫu desktop, rà soát mã nguồn để tìm lỗi, sau đó tái kiến trúc theo mô hình client mỏng – backend.
+  \item \textit{Thực nghiệm và kiểm thử:} kiểm thử tự động ở ba mức (đơn vị, tích hợp với PostgreSQL thật, đầu-cuối qua giao diện Electron thật); chỉ công bố các số liệu có thể tái lập bằng lệnh kiểm thử kèm theo mã nguồn.
+\end{itemize}
+
+\mucmodau{6. Kết cấu của đồ án}
+Ngoài phần Mở đầu, Kết luận, Tài liệu tham khảo và Phụ lục, báo cáo gồm bốn chương:
+\begin{itemize}
+  \item \textbf{Chương 1 – Tổng quan đề tài:} bối cảnh, khảo sát giải pháp liên quan, phát biểu bài toán, phạm vi và hướng tiếp cận.
+  \item \textbf{Chương 2 – Cơ sở lý thuyết và công nghệ sử dụng:} các khâu của trợ lý giọng nói, OAuth 2.0, Google Calendar API, truyền dữ liệu thời gian thực, độ trễ và các công nghệ được chọn.
+  \item \textbf{Chương 3 – Phân tích và thiết kế hệ thống:} yêu cầu, kiến trúc tổng thể, thiết kế ứng dụng desktop, backend, cơ sở dữ liệu, xác thực, agent hiểu lệnh, hội thoại, giọng nói, kênh thời gian thực và bảo mật.
+  \item \textbf{Chương 4 – Triển khai, kiểm thử và đánh giá:} môi trường, kết quả hiện thực, kết quả kiểm thử, đánh giá mức độ đáp ứng yêu cầu, hạn chế và tiến độ so với kế hoạch.
+\end{itemize}
+So với báo cáo định kỳ lần 1 (dừng ở phân tích và thiết kế ban đầu), báo cáo lần này bổ sung toàn bộ phần hiện thực và kiểm thử; các thay đổi về lựa chọn công nghệ và tiến độ được tổng hợp ở mục~\ref{sec:progress}.
 \clearpage

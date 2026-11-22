@@ -1,85 +1,198 @@
-\chapter{CƠ SỞ LÝ THUYẾT}
+\chuong{CƠ SỞ LÝ THUYẾT VÀ CÔNG NGHỆ SỬ DỤNG}{Cơ sở lý thuyết và công nghệ sử dụng}
 \label{ch:theory}
 
-\section{Voice Activity Detection (VAD)}
-Phát hiện hoạt động giọng nói (Voice Activity Detection, VAD) phân chia luồng âm thanh thành đoạn có tiếng nói và đoạn im lặng hoặc nhiễu. Trong trợ lý thường trú, VAD vừa giúp hạn chế xử lý các khoảng im lặng, vừa hỗ trợ xác định khi nào người dùng kết thúc câu (endpointing). Đây là hai nhiệm vụ liên quan nhưng không đồng nhất: bộ phân loại tiếng nói có thể phát hiện âm thanh có giọng nói, còn endpointing cần thêm quy tắc về thời lượng im lặng, khoảng đệm trước/sau câu và trường hợp người dùng ngắt quãng.
+Chương này trình bày kiến thức nền của từng khâu trong một trợ lý giọng nói, các chuẩn ủy quyền và giao thức liên quan, đồng thời nêu công nghệ mà nhóm lựa chọn cho mỗi khâu cùng lý do lựa chọn.
 
-Các cách tiếp cận phổ biến gồm so sánh năng lượng với ngưỡng, mô hình thống kê dựa trên đặc trưng phổ và mô hình học máy. Phương pháp ngưỡng nhẹ nhưng nhạy với tiếng ồn; mô hình thống kê có thể khai thác đặc trưng tín hiệu nhưng cần hiệu chỉnh; mô hình học máy có khả năng phân biệt tốt hơn trong một số môi trường nhưng làm tăng chi phí tính toán và phụ thuộc dữ liệu huấn luyện. VAD thống kê là một hướng nghiên cứu nền tảng được mô tả bởi Sohn và cộng sự \cite{sohnvad}.
+\section{Tổng quan pipeline của trợ lý giọng nói}
+Một trợ lý giọng nói hướng tác vụ thường được tổ chức thành chuỗi xử lý như Sơ đồ~\ref{dia:generic-pipeline} \cite{jurafsky}. Tín hiệu từ microphone đi qua bộ phát hiện tiếng nói để xác định đoạn có lời; đoạn này được nhận dạng thành văn bản; văn bản được phân tích thành ý định và các thực thể; bộ quản lý hội thoại quyết định hỏi lại, yêu cầu xác nhận hay thực thi; kết quả thực thi được diễn đạt thành câu trả lời và đọc lên bằng giọng tổng hợp. Mỗi khâu có thể sai theo cách riêng, vì vậy đầu ra của khâu trước luôn được xem là giả thuyết cần kiểm tra ở khâu sau.
 
-Trong nguyên mẫu, đầu vào VAD sẽ được lấy từ các khung âm thanh liên tiếp. Bộ đệm trước khi kích hoạt giữ lại một đoạn ngắn để không mất âm tiết đầu câu; bộ đệm sau khi phát hiện im lặng giúp tránh cắt mất âm cuối. Các tham số cần khảo sát là kích thước khung, ngưỡng xác suất tiếng nói, thời gian im lặng kết thúc và mức độ chịu nhiễu. Không chọn ngưỡng cuối cùng trước khi có kiểm thử trên microphone và môi trường sử dụng dự kiến.
+\begin{diagram}[!htbp]
+\centering
+\begin{tikzpicture}[node distance=0.45cm,kh/.style={hop,text width=2.15cm,minimum height=1.6cm}]
+  \node[kh] (mic) {Microphone};
+  \node[kh,right=of mic] (vad) {VAD,\\từ khóa\\đánh thức};
+  \node[kh,right=of vad] (stt) {Nhận dạng\\tiếng nói\\(STT)};
+  \node[kh,right=of stt] (nlu) {Hiểu lệnh\\(ý định,\\thực thể)};
+  \node[kh,right=of nlu] (time) {Suy luận\\ngày giờ};
+  \node[kh,below=0.75cm of time] (dm) {Quản lý\\hội thoại,\\xác nhận};
+  \node[kh,left=of dm] (act) {Thực thi\\trên dịch\\vụ lịch};
+  \node[kh,left=of act] (gen) {Sinh câu\\phản hồi};
+  \node[kh,left=of gen] (tts) {Tổng hợp\\tiếng nói\\(TTS)};
+  \node[kh,left=of tts] (spk) {Loa,\\giao diện};
+  \draw[mui] (mic)--(vad); \draw[mui] (vad)--(stt); \draw[mui] (stt)--(nlu); \draw[mui] (nlu)--(time);
+  \draw[mui] (time)--(dm); \draw[mui] (dm)--(act); \draw[mui] (act)--(gen); \draw[mui] (gen)--(tts); \draw[mui] (tts)--(spk);
+\end{tikzpicture}
+\caption{Chuỗi xử lý tổng quát của trợ lý giọng nói hướng tác vụ}\label{dia:generic-pipeline}
+\nguon{Nhóm vẽ lại theo mô hình hệ thống hội thoại hướng tác vụ trong \cite{jurafsky}.}
+\end{diagram}
 
-\section{Wake Word Detection}
-Phát hiện từ khóa đánh thức (wake word detection) theo dõi âm thanh để kích hoạt trợ lý khi người dùng gọi. Thiết kế cần cân bằng hai loại sai: kích hoạt nhầm khi không có lệnh và bỏ sót từ khóa thật. Ngưỡng quyết định thấp thường tăng khả năng nhận ra từ khóa nhưng cũng có thể làm tăng kích hoạt nhầm; ngưỡng cao có tác dụng ngược lại. Vì bộ phát hiện có thể hoạt động lâu dài, mức sử dụng CPU, quyền truy cập microphone và trạng thái báo hiệu đang nghe cũng là yêu cầu quan trọng.
+\section{Phát hiện hoạt động giọng nói (VAD)}
+\subsection{Khái niệm và phương pháp}
+VAD phân chia luồng âm thanh thành đoạn có tiếng nói và đoạn im lặng hoặc nhiễu. Trong trợ lý giọng nói, VAD đảm nhiệm hai việc liên quan nhưng không đồng nhất: (i) lọc bỏ khoảng lặng để không gửi dữ liệu thừa tới bộ nhận dạng; (ii) xác định thời điểm người dùng nói xong (\textit{endpointing}). Việc thứ hai cần thêm quy tắc về thời lượng im lặng cho phép, khoảng đệm trước và sau câu, và thời lượng tối thiểu của một đoạn nói.
 
-Các phương án cần khảo sát gồm bộ phát hiện từ khóa chạy cục bộ như openWakeWord và dịch vụ thương mại như Porcupine \cite{openwakeword,porcupine}. Việc lựa chọn sẽ dựa trên hỗ trợ từ khóa tiếng Việt hoặc khả năng tùy biến, giấy phép, khả năng chạy ngoại tuyến, mức tiêu thụ tài nguyên, độ trễ và kết quả kiểm thử trên tập âm thanh của đề tài. Báo cáo lần 1 chưa khẳng định phương án đã được lựa chọn hoặc huấn luyện.
+Ba nhóm phương pháp phổ biến là so sánh năng lượng với ngưỡng, mô hình thống kê trên đặc trưng phổ \cite{sohnvad} và mô hình mạng nơ-ron. Phương pháp ngưỡng rất nhẹ nhưng nhạy với tiếng ồn; mô hình thống kê cần hiệu chỉnh theo môi trường; mô hình nơ-ron phân biệt tiếng nói với nhiễu tốt hơn, đổi lại cần runtime suy luận.
+
+\subsection{Silero VAD và các tham số cắt câu}
+Đề tài dùng Silero VAD \cite{silero} thông qua thư viện \textit{vad-web} \cite{vadweb}. Mô hình ở định dạng ONNX, được ONNX Runtime Web thực thi bằng WebAssembly ngay trong tiến trình giao diện của ứng dụng \cite{onnxweb}, nên âm thanh chỉ rời máy người dùng sau khi một đoạn tiếng nói hoàn chỉnh đã được cắt ra. Với mỗi khung âm thanh, mô hình trả về xác suất có tiếng nói; thư viện áp dụng một máy trạng thái có trễ (hysteresis) với các tham số sau (giá trị nhóm đang dùng ghi trong ngoặc):
+\begin{itemize}
+  \item \textit{Ngưỡng dương} (0,5): xác suất từ mức này trở lên được xem là bắt đầu có tiếng nói.
+  \item \textit{Ngưỡng âm} (0,35): xác suất dưới mức này mới được tính là im lặng; khoảng giữa hai ngưỡng giữ nguyên trạng thái, tránh dao động.
+  \item \textit{Thời gian chờ kết thúc} (400 ms): độ dài im lặng liên tục để kết luận người dùng đã nói xong.
+  \item \textit{Thời lượng nói tối thiểu} (250 ms): đoạn ngắn hơn bị coi là nhiễu (misfire) và bỏ qua.
+  \item \textit{Đệm trước câu} (400 ms): phần âm thanh ngay trước thời điểm kích hoạt được giữ lại để không mất âm tiết đầu.
+\end{itemize}
+Thời gian chờ kết thúc ngắn làm phản hồi nhanh hơn nhưng dễ cắt ngang khi người dùng ngập ngừng; đây là tham số cần hiệu chỉnh bằng thực nghiệm với người dùng thật ở giai đoạn sau.
+
+\section{Phát hiện từ khóa đánh thức}
+Bộ phát hiện từ khóa đánh thức (wake word) theo dõi âm thanh liên tục và chỉ kích hoạt trợ lý khi nghe đúng cụm từ định trước. Thiết kế phải cân bằng hai loại sai: kích hoạt nhầm (false accept) và bỏ sót (false reject); ngưỡng quyết định thấp làm tăng loại thứ nhất, ngưỡng cao làm tăng loại thứ hai. Vì chạy thường trực, bộ phát hiện còn phải tiêu tốn ít CPU và xử lý hoàn toàn trên thiết bị để không truyền âm thanh nền ra ngoài. Hai phương án đã khảo sát là openWakeWord (mã nguồn mở, cho phép huấn luyện từ khóa tùy biến bằng dữ liệu tổng hợp) và Porcupine (thương mại, có công cụ tạo từ khóa) \cite{openwakeword,porcupine}.
+
+Đến báo cáo định kỳ lần 2, nhóm chủ động \textit{chưa} hiện thực từ khóa đánh thức: ứng dụng bắt đầu nghe khi người dùng bấm nút, sau đó VAD tự cắt từng câu lệnh. Thứ tự ưu tiên này nhằm hoàn thiện luồng thao tác lịch an toàn trước, vì một trợ lý luôn nghe mà thao tác ghi chưa có xác nhận sẽ nguy hiểm hơn là hữu ích. Từ khóa đánh thức và chế độ chạy nền nằm trong kế hoạch giai đoạn cuối (mục~\ref{sec:progress}).
 
 \section{Nhận dạng tiếng nói}
-\subsection{Speech-to-Text}
-Nhận dạng tiếng nói thành văn bản (Speech-to-Text, STT), còn gọi là nhận dạng tiếng nói tự động (Automatic Speech Recognition, ASR), ánh xạ tín hiệu âm thanh sang chuỗi từ. Chất lượng phụ thuộc mô hình, ngôn ngữ, giọng vùng miền, âm thanh nền, microphone và cách chia đoạn. Một đầu ra STT cần được xem là giả thuyết có thể sai; các hành động lịch không nên được thực hiện chỉ vì một chuỗi nhận dạng trông có vẻ hợp lệ.
+\subsection{Nhận dạng tiếng nói tự động}
+Nhận dạng tiếng nói (STT/ASR) ánh xạ tín hiệu âm thanh sang chuỗi từ. Chất lượng phụ thuộc mô hình, ngôn ngữ, giọng vùng miền, tiếng ồn nền, microphone và cách cắt đoạn. Whisper là mô hình encoder–decoder đa nhiệm được huấn luyện trên dữ liệu đa ngôn ngữ quy mô lớn, có nhiều cấu hình kích thước \cite{radford2022whisper}; PhoWhisper cho thấy việc tinh chỉnh trên dữ liệu tiếng Việt cải thiện đáng kể độ chính xác \cite{phowhisper}. Gần đây, các mô hình đa phương thức như Gemini nhận trực tiếp âm thanh làm đầu vào và có thể được yêu cầu chép lại lời nói \cite{geminiaudio}.
 
-Whisper là mô hình encoder--decoder đa nhiệm được huấn luyện trên dữ liệu tiếng nói đa ngôn ngữ và có nhiều cấu hình kích thước \cite{radford2022whisper}. Mô hình lớn có thể đòi hỏi nhiều bộ nhớ và thời gian suy luận hơn; mô hình nhỏ hoặc lượng tử hóa giảm tài nguyên nhưng cần đo ảnh hưởng đến lỗi nhận dạng tiếng Việt. Bên cạnh chạy cục bộ, STT đám mây có thể giảm yêu cầu phần cứng nhưng truyền âm thanh ra ngoài máy và phụ thuộc mạng, chính sách dữ liệu và chi phí dịch vụ.
+\subsection{Chạy cục bộ và dịch vụ đám mây}
+Mô hình nhận dạng có thể chạy ngay trên máy người dùng hoặc được gọi như một dịch vụ đám mây. Bảng~\ref{tab:stt} đối chiếu hai phương án theo các tiêu chí ảnh hưởng trực tiếp tới thiết kế.
 
-\begin{table}[H]
-\caption{Đối chiếu sơ bộ phương án STT}\label{tab:stt}
-\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{|p{2.8cm}|p{5.9cm}|p{5.9cm}|}\hline
-\textbf{Tiêu chí} & \textbf{Chạy cục bộ} & \textbf{Dịch vụ đám mây}\\\hline
-Quyền riêng tư & Âm thanh có thể được giữ trên thiết bị, tùy cấu hình ghi log. & Âm thanh được gửi đến nhà cung cấp; cần đánh giá chính sách lưu trữ và xử lý dữ liệu.\\\hline
-Độ trễ & Phụ thuộc mô hình, CPU/GPU và thời lượng câu nói. & Phụ thuộc mạng, thời gian tải lên và thời gian xử lý phía dịch vụ.\\\hline
-Tính sẵn sàng & Có thể hoạt động khi mất mạng nếu mô hình và runtime đã được cài. & Cần kết nối mạng và dịch vụ đang khả dụng.\\\hline
-Chi phí và tài nguyên & Không nhất thiết có phí theo lượt gọi, nhưng tiêu thụ bộ nhớ và năng lượng của máy. & Có thể tính phí theo mức sử dụng; giảm tài nguyên suy luận trên máy người dùng.\\\hline
-\end{tabular}
-\nguon{Nhóm tổng hợp; các tiêu chí sẽ được đối chiếu bằng nguyên mẫu.}
+\begin{table}[!htbp]
+\caption{Đối chiếu phương án STT chạy cục bộ và dịch vụ đám mây}\label{tab:stt}
+\bang
+\begin{tabularx}{\textwidth}{|L{2.8cm}|Y|Y|}\hline
+\td{Tiêu chí} & \td{Chạy cục bộ} & \td{Dịch vụ đám mây}\\\hline
+Quyền riêng tư & Âm thanh được giữ trên thiết bị. & Âm thanh được gửi tới nhà cung cấp; cần xem xét chính sách lưu trữ và xử lý dữ liệu.\\\hline
+Độ trễ & Phụ thuộc kích thước mô hình, CPU/GPU và độ dài câu. & Phụ thuộc mạng, thời gian tải lên và thời gian xử lý của dịch vụ.\\\hline
+Tính sẵn sàng & Hoạt động khi mất mạng nếu mô hình đã cài sẵn. & Cần mạng; chịu giới hạn hạn mức (quota) của dịch vụ.\\\hline
+Tài nguyên và chi phí & Tốn bộ nhớ, năng lượng của máy; mô hình tốt cho tiếng Việt có kích thước lớn. & Không tốn tài nguyên suy luận tại chỗ; có thể tính phí theo mức sử dụng.\\\hline
+\end{tabularx}
+\nguon{Nhóm tổng hợp.}
 \end{table}
+Với mục tiêu ứng dụng desktop nhẹ, chạy được trên máy không có GPU, đề tài chọn STT đám mây (Gemini) đặt sau backend. Ứng dụng không gọi thẳng nhà cung cấp mà gửi đoạn âm thanh đã cắt tới backend; nhờ đó khóa API không nằm trên máy người dùng và có thể thay nhà cung cấp STT mà không phải phát hành lại ứng dụng. Việc bổ sung một bộ STT cục bộ (chẳng hạn Whisper/PhoWhisper) sau cùng giao diện trừu tượng là hướng mở rộng đã được tính đến trong thiết kế.
 
 \subsection{Đánh giá chất lượng nhận dạng}
-Tỷ lệ lỗi từ (Word Error Rate, WER) được tính từ số từ thay thế, chèn và xóa so với bản chép tham chiếu, chia cho số từ trong bản tham chiếu. Khi đánh giá tiếng Việt, quy tắc tách từ và chuẩn hóa văn bản phải được thống nhất trước; ví dụ cách viết số, dấu câu và chữ viết hoa có thể làm thay đổi kết quả. Ngoài WER, cần ghi nhận tỷ lệ câu lệnh được phân tích đúng ý định và trường dữ liệu, vì một lỗi nhỏ trong thời gian có thể gây tác động nghiệp vụ lớn hơn một lỗi ở từ không quan trọng.
+Chỉ số phổ biến là tỷ lệ lỗi từ:
+\begin{equation}
+  \mathrm{WER} = \frac{S + D + I}{N}
+\end{equation}
+trong đó $S$, $D$, $I$ lần lượt là số từ bị thay thế, bị xóa và bị chèn so với bản chép tham chiếu, $N$ là số từ của bản tham chiếu. Khi đánh giá tiếng Việt, quy tắc chuẩn hóa văn bản (cách viết số, dấu câu, chữ hoa) phải được thống nhất trước. Với trợ lý lịch, WER chưa phản ánh hết tác động nghiệp vụ: nhận sai một từ chỉ thời gian nghiêm trọng hơn nhiều so với sai một hư từ. Vì vậy bên cạnh WER cần đo tỷ lệ câu lệnh được hiểu đúng ý định và đúng các trường thời gian.
 
-\section{Hiểu ý định và trích xuất thực thể}
-Hiểu ngôn ngữ tự nhiên (Natural Language Understanding, NLU) chuyển văn bản STT thành thông tin có cấu trúc. Phân loại ý định xác định người dùng muốn xem, tạo, tìm, sửa hay xóa sự kiện; trích xuất thực thể xác định các giá trị như tiêu đề, ngày, giờ bắt đầu, thời lượng, địa điểm hoặc lịch. Hệ thống cần giữ lại cụm từ gốc để có thể giải thích hoặc yêu cầu xác nhận khi phân tích không chắc chắn.
+\section{Hiểu ngôn ngữ tự nhiên}
+\subsection{Ý định và thực thể}
+Hiểu ngôn ngữ tự nhiên (NLU) chuyển câu văn bản thành biểu diễn có cấu trúc. \textit{Phân loại ý định} xác định người dùng muốn làm gì (xem, tạo, sửa, xóa sự kiện...); \textit{trích xuất thực thể} (còn gọi là điền khe – slot filling) xác định các tham số của ý định đó: tiêu đề, ngày, giờ, thời lượng, địa điểm, từ khóa nhận diện sự kiện cần sửa \cite{jurafsky}.
 
-Một kết quả phân tích ban đầu có thể biểu diễn theo cấu trúc sau; trường chưa biết phải được để trống thay vì tự suy đoán:
-\begin{verbatim}
-{
-  "intent": "create_event",
-  "title": "Họp nhóm",
-  "start_expression": "ngày mai lúc 15 giờ",
-  "duration_minutes": null,
-  "timezone": "Asia/Ho_Chi_Minh",
-  "confidence": 0.0
-}
-\end{verbatim}
-Giá trị confidence trong ví dụ chỉ minh họa cấu trúc, không phải kết quả đo. Sau khi phân tích, bộ kiểm tra nghiệp vụ xác định trường bắt buộc còn thiếu và quyết định gọi API, hỏi lại hay chuyển yêu cầu cho người dùng xác nhận.
+\subsection{Tiếp cận dựa trên luật và dựa trên mô hình ngôn ngữ lớn}
+\textit{Tiếp cận dựa trên luật} dùng từ điển từ khóa, biểu thức chính quy và ngữ pháp do con người viết. Ưu điểm là tất định, nhanh, không tốn chi phí gọi dịch vụ, dễ viết ca kiểm thử; nhược điểm là độ phủ hạn chế trước cách diễn đạt tự do và tốn công bảo trì. Tiếng Việt gây thêm khó khăn: người dùng có thể gõ không dấu, và nhiều từ khóa không dấu trùng với từ thường hoặc tên riêng (“huy”, “mai”, “hoan”).
+
+\textit{Tiếp cận dựa trên LLM} giao việc phân tích cho mô hình ngôn ngữ lớn. Kỹ thuật then chốt là \textit{đầu ra có cấu trúc}: yêu cầu mô hình trả về JSON tuân theo một lược đồ cho trước, nhờ đó kết quả có thể được kiểm tra bằng chương trình \cite{geministructured}. LLM bao phủ tốt cách diễn đạt đa dạng, nhưng có độ trễ và chi phí cho mỗi lần gọi, có thể bị giới hạn hạn mức, và có thể “suy diễn” ra ngày giờ mà người dùng không nói.
+
+\subsection{Kết hợp hai tiếp cận}
+Đề tài kết hợp hai tiếp cận theo nguyên tắc: LLM được hỏi trước để tận dụng độ phủ; kết quả của LLM phải qua kiểm tra lược đồ và đối chiếu với bộ phân tích thời gian tất định; khi LLM lỗi, quá thời gian, trả về kết quả không hợp lệ hoặc có độ tin cậy thấp thì bộ luật tiếp quản. Thiết kế chi tiết được trình bày ở mục~\ref{sec:nlu-design}.
 
 \section{Suy luận ngày giờ}
-Suy luận ngày giờ (Date/Time Reasoning) chuyển biểu thức tự nhiên thành thời điểm tuyệt đối. Các đầu vào như “ngày mai”, “chiều thứ sáu tuần tới” hay “sau cuộc họp trước” phụ thuộc thời điểm tham chiếu, lịch sử hội thoại và múi giờ. Dữ liệu giờ địa phương cần được chuyển đổi nhất quán sang biểu diễn thời gian mà API chấp nhận; thời gian hiển thị phải giữ múi giờ của lịch hoặc múi giờ do người dùng cấu hình.
+Suy luận ngày giờ chuyển biểu thức tự nhiên thành thời điểm tuyệt đối. Các khó khăn chính gồm:
+\begin{itemize}
+  \item \textit{Tính tương đối:} “ngày mai”, “thứ sáu tuần sau”, “cuối tuần” phụ thuộc thời điểm tham chiếu và múi giờ; cùng một câu nói lúc 23 giờ 59 phút và lúc 0 giờ 01 phút cho kết quả khác nhau.
+  \item \textit{Tính nhập nhằng của giờ:} “3 giờ” có thể là 3 giờ sáng hoặc 15 giờ; “12 giờ đêm” thuộc về ngày hôm sau.
+  \item \textit{Con số không phải giờ:} “thứ 2”, “5 người”, “phòng 402”, “ngày 20/11” đều chứa số nhưng không biểu thị giờ.
+  \item \textit{Thông tin thiếu:} có ngày nhưng không có giờ, có giờ bắt đầu nhưng không có thời lượng.
+\end{itemize}
+Nguyên tắc xử lý được áp dụng trong đề tài: cố định một thời điểm tham chiếu cho cả lượt lệnh; diễn giải theo múi giờ IANA hiệu lực của người dùng; mọi quy tắc mặc định phải tất định và không phụ thuộc giờ hiện tại theo cách gây bất ngờ; khi không xác định được duy nhất thì hỏi lại thay vì đoán. Thư viện \textit{luxon} được dùng cho phép tính ngày giờ theo múi giờ, \textit{chrono-node} hỗ trợ phân tích biểu thức tiếng Anh \cite{luxon,chrono}; phần ngữ pháp tiếng Việt do nhóm tự xây dựng.
 
-Quy trình đề xuất gồm: lấy thời điểm hiện tại và múi giờ; phân tích ngày, giờ, khoảng thời gian và quan hệ tương đối; chuẩn hóa thành thời điểm bắt đầu/kết thúc; kiểm tra thời lượng dương, thứ tự thời gian và giới hạn hợp lệ; cuối cùng hỏi lại nếu ngày hoặc giờ còn mơ hồ. Nếu người dùng chỉ nêu giờ mà không nêu ngày, hoặc nêu ngày nhưng không có thời lượng/kết thúc, chính sách mặc định phải được thống nhất rõ ràng và thông báo cho người dùng, không âm thầm chọn giá trị gây bất ngờ.
+\section{Quản lý hội thoại}
+Bộ quản lý hội thoại duy trì \textit{trạng thái hội thoại} qua nhiều lượt nói và quyết định hành động tiếp theo của hệ thống \cite{jurafsky}. Các khái niệm liên quan:
+\begin{itemize}
+  \item \textit{Ngữ cảnh ngắn hạn:} thông tin của tác vụ đang dang dở, ví dụ một thao tác xóa đang chờ người dùng trả lời “có” hoặc “không”.
+  \item \textit{Bộ nhớ dài hạn:} thông tin giữ qua nhiều phiên (thói quen, sở thích); khi hội thoại dài vượt cửa sổ ngữ cảnh của mô hình thì cần kỹ thuật tóm tắt.
+  \item \textit{Chiến lược làm rõ và xác nhận:} hỏi lại đúng thông tin còn thiếu; xác nhận tường minh trước thao tác không thể hoàn tác.
+\end{itemize}
+Với nghiệp vụ lịch, dữ liệu gốc luôn nằm ở dịch vụ lịch nên trợ lý không cần bộ nhớ dài hạn để hoạt động đúng. Đề tài tập trung vào ngữ cảnh ngắn hạn: lưu lịch sử hội thoại và mô hình hóa “thao tác chờ xác nhận” như một thực thể có vòng đời và thời hạn riêng (mục~\ref{sec:dialog-design}). Bộ nhớ dài hạn và tóm tắt ngữ cảnh thuộc hướng phát triển.
 
 \section{Tổng hợp tiếng nói}
-Tổng hợp văn bản thành tiếng nói (Text-to-Speech, TTS) tạo phản hồi âm thanh từ văn bản. TTS chạy cục bộ giúp hạn chế gửi nội dung ra dịch vụ ngoài và có thể dùng khi mất mạng, nhưng chất lượng giọng đọc, ngôn ngữ và tài nguyên phụ thuộc engine được cài. TTS đám mây có thể cung cấp thêm lựa chọn giọng đọc nhưng cần mạng, phát sinh chi phí và có thể truyền nội dung lịch tới nhà cung cấp.
+Tổng hợp tiếng nói (TTS) tạo âm thanh từ văn bản. Các hệ thống nơ-ron hiện đại cho giọng tự nhiên hơn hẳn phương pháp ghép nối. VITS là mô hình đầu-cuối kết hợp bộ tự mã hóa biến phân có điều kiện, luồng chuẩn hóa và huấn luyện đối kháng, sinh trực tiếp dạng sóng từ chuỗi âm vị \cite{vits}. Piper đóng gói các giọng VITS ở định dạng ONNX kèm bộ chuyển văn bản thành âm vị, đủ nhẹ để chạy thời gian thực trên CPU \cite{piper}; đề tài dùng Piper với giọng tiếng Việt, chạy trên máy chủ dưới dạng tiến trình con.
 
-Với phản hồi dạng luồng, hệ thống có thể bắt đầu phát phần văn bản đầu tiên trước khi toàn bộ câu được tạo xong. Cách này có thể giảm thời gian tới âm thanh đầu tiên nhưng phải xử lý thứ tự phát, ngắt lời, lỗi giữa luồng và không đọc lặp khi phải sửa nội dung. Trong nguyên mẫu, giao diện văn bản vẫn là kênh phản hồi bắt buộc; TTS là mô-đun bổ sung có thể tắt.
+Để giảm thời gian chờ, câu trả lời không được tổng hợp nguyên khối mà được \textit{tách thành từng câu}; mỗi câu được tổng hợp và phát ngay khi sẵn sàng, trong lúc các câu sau tiếp tục được xử lý. Bộ tách câu phải giữ nguyên các cụm dễ bị cắt nhầm như giờ (“09:00”), số thập phân, ngày tháng và chữ viết tắt. Khi trợ lý đang đọc, microphone phải được chặn hoặc bỏ qua để giọng đọc không bị thu lại như một câu lệnh mới (vòng phản hồi).
 
-\section{OAuth 2.0 và Google Calendar API}
-OAuth 2.0 cho phép ứng dụng được người dùng ủy quyền truy cập tài nguyên mà không yêu cầu ứng dụng biết mật khẩu Google của họ \cite{rfc6749}. Với ứng dụng desktop, hướng phù hợp là Authorization Code cùng Proof Key for Code Exchange (PKCE), theo khuyến nghị cho ứng dụng gốc \cite{rfc7636,rfc8252}. Trình duyệt hệ thống thực hiện đăng nhập và đồng ý cấp quyền; ứng dụng nhận mã ủy quyền qua vòng lặp chuyển hướng cục bộ, đổi mã lấy token rồi sử dụng access token khi gọi API.
+\section{Ủy quyền và xác thực}
+\subsection{OAuth 2.0 cho ứng dụng gốc và PKCE}
+OAuth 2.0 cho phép ứng dụng được người dùng ủy quyền truy cập tài nguyên mà không cần biết mật khẩu của họ \cite{rfc6749}. Với ứng dụng cài trên máy (native app), RFC 8252 khuyến nghị dùng luồng Authorization Code qua \textit{trình duyệt hệ thống} và nhận kết quả bằng \textit{chuyển hướng loopback} tới một cổng trên địa chỉ 127.0.0.1 \cite{rfc8252,goauthnative}. Vì ứng dụng gốc không giữ được bí mật, luồng này phải đi kèm PKCE \cite{rfc7636}: ứng dụng sinh ngẫu nhiên một \textit{code verifier}, gửi đi giá trị băm
+\begin{equation}
+  \textit{code\_challenge} = \mathrm{BASE64URL}\bigl(\mathrm{SHA256}(\textit{code\_verifier})\bigr)
+\end{equation}
+khi bắt đầu, và chỉ khi đổi mã lấy token mới xuất trình \textit{code verifier}. Kẻ chặn được mã ủy quyền nhưng không có \textit{verifier} sẽ không đổi được token.
 
-Google Calendar API biểu diễn lịch và sự kiện qua các tài nguyên riêng, hỗ trợ liệt kê, đọc, tạo, cập nhật và xóa sự kiện \cite{gcalapi,gcalevents}. Quyền truy cập cần được giới hạn theo chức năng thực sự sử dụng và đối chiếu với danh sách OAuth scope của Google \cite{gcalscopes}. Token có thời hạn ngắn; nếu cần tiếp tục phiên làm việc, refresh token phải được lưu trữ an toàn bằng cơ chế bảo vệ của hệ điều hành, không ghi vào mã nguồn, log, cơ sở dữ liệu dạng rõ hoặc giao diện renderer. Khi người dùng ngắt kết nối, ứng dụng xóa thông tin xác thực cục bộ và cung cấp cách thu hồi quyền tại tài khoản Google.
+\subsection{JWT, refresh token xoay vòng và mã hóa khi lưu}
+JSON Web Token (JWT) là định dạng token có chữ ký, mang các khẳng định như chủ thể, nơi phát hành, đối tượng nhận và thời điểm hết hạn \cite{rfc7519}; máy chủ kiểm tra chữ ký mà không cần tra cứu phiên. Vì JWT không thu hồi được trước hạn, thời hạn của access token nên ngắn và đi kèm \textit{refresh token}. Khuyến nghị bảo mật hiện hành cho OAuth 2.0 yêu cầu refresh token của client công khai phải được \textit{xoay vòng} (mỗi lần dùng cấp token mới) kèm \textit{phát hiện tái sử dụng}: nếu một refresh token cũ xuất hiện lại, toàn bộ chuỗi phiên bị thu hồi \cite{rfc9700}.
+
+Token của dịch vụ bên thứ ba khi lưu trong cơ sở dữ liệu cần được mã hóa. AES ở chế độ GCM vừa bảo mật vừa xác thực bản mã, nên phát hiện được việc dữ liệu bị sửa \cite{nistgcm}. Các giá trị chỉ cần so khớp (refresh token của chính hệ thống, mã đăng nhập dùng một lần) được lưu dưới dạng giá trị băm SHA-256.
+
+\section{Google Calendar API}
+Google Calendar API v3 biểu diễn lịch và sự kiện dưới dạng tài nguyên REST, hỗ trợ liệt kê, đọc, tạo, cập nhật và xóa sự kiện \cite{gcalapi,gcalevents}. Một số đặc điểm ảnh hưởng tới thiết kế:
+\begin{itemize}
+  \item Sự kiện có giờ dùng trường \ma{dateTime}; sự kiện cả ngày dùng trường \ma{date} với ngày kết thúc \textit{không bao gồm} (exclusive).
+  \item Kết quả liệt kê được phân trang; sự kiện lặp có thể được “trải” thành từng lần xuất hiện.
+  \item Dịch vụ áp dụng hạn mức và có thể trả lỗi tạm thời; client cần thử lại có giãn cách (exponential backoff).
+  \item Quyền truy cập xác định bằng \textit{scope}; đề tài chỉ xin scope \ma{calendar.events} (đọc/ghi sự kiện) thay vì toàn quyền lịch \cite{gcalscopes}.
+\end{itemize}
 
 \section{Truyền dữ liệu thời gian thực}
-Âm thanh có thể được xử lý theo lô sau khi người dùng dừng nói hoặc gửi thành các khung nhỏ liên tục. Gửi theo lô đơn giản hơn và dễ kiểm thử nhưng tăng thời gian chờ tới khi có kết quả; streaming giảm thời gian chờ tiềm năng, đổi lại cần quản lý bộ đệm, thứ tự khung, mất kết nối và trạng thái kết thúc luồng. WebSocket hỗ trợ truyền hai chiều trên một kết nối TCP \cite{rfc6455}; Server-Sent Events phù hợp với thông báo một chiều từ máy chủ, còn HTTP streaming có thể truyền nội dung theo từng phần.
+Âm thanh và phản hồi có thể được trao đổi theo lô (gửi cả đoạn, nhận cả kết quả) hoặc theo luồng (gửi/nhận từng phần). Bảng~\ref{tab:realtime} so sánh các cơ chế truyền theo luồng thường dùng.
 
-Thiết kế ban đầu sẽ ưu tiên hoàn thiện giao tiếp yêu cầu--phản hồi theo lô giữa các mô-đun. Chỉ chuyển sang streaming khi phép đo cho thấy lợi ích rõ ràng. Định dạng trao đổi nội bộ giữa các mô-đun cần nêu rõ số kênh, tần số lấy mẫu, độ sâu mẫu và mốc thời gian; adapter STT chịu trách nhiệm chuyển mẫu âm thanh sang định dạng mà dịch vụ hoặc mô hình yêu cầu.
+\begin{table}[!htbp]
+\caption{So sánh các cơ chế truyền dữ liệu thời gian thực}\label{tab:realtime}
+\bang
+\begin{tabularx}{\textwidth}{|L{2.5cm}|L{2.4cm}|Y|Y|}\hline
+\td{Cơ chế} & \td{Chiều truyền} & \td{Ưu điểm} & \td{Hạn chế}\\\hline
+WebSocket \cite{rfc6455} & Hai chiều & Một kết nối cho cả lệnh, trạng thái và dữ liệu; độ trễ thấp; được hỗ trợ rộng rãi. & Phải tự định nghĩa giao thức ứng dụng, tự quản lý xác thực, giới hạn khung và giữ kết nối.\\\hline
+Server-Sent Events \cite{sse} & Máy chủ → client & Đơn giản, chạy trên HTTP thông thường, tự kết nối lại. & Một chiều; chỉ truyền văn bản.\\\hline
+HTTP streaming & Máy chủ → client & Truyền phản hồi theo từng phần mà không cần giao thức mới. & Một chiều trong một yêu cầu; khó hủy và ghép nhiều loại thông điệp.\\\hline
+WebRTC \cite{webrtc} & Hai chiều, ngang hàng & Tối ưu cho âm thanh/hình ảnh liên tục, có sẵn khử nhiễu và bù trễ mạng. & Thiết lập phức tạp (báo hiệu, ICE); thừa với mô hình gửi từng câu lệnh.\\\hline
+\end{tabularx}
+\nguon{Nhóm tổng hợp từ các tài liệu chuẩn tương ứng.}
+\end{table}
+Vì trợ lý xử lý theo từng câu lệnh ngắn đã được VAD cắt sẵn, đề tài không cần truyền âm thanh liên tục kiểu WebRTC. Backend cung cấp đồng thời API HTTP theo lô và một kênh WebSocket truyền trạng thái xử lý, từng câu trả lời và âm thanh của từng câu (mục~\ref{sec:realtime-design}).
+
+Về \textit{đệm âm thanh}, phía thu giữ một bộ đệm vòng để lấy phần âm thanh ngay trước thời điểm VAD kích hoạt; phía phát dùng hàng đợi để các câu được phát đúng thứ tự, không chồng lên nhau, và có thể hủy toàn bộ khi người dùng bấm dừng.
 
 \section{Độ trễ và phương pháp đo}
-Độ trễ đầu-cuối được phân rã thành thời gian chờ kết thúc câu, STT, NLU và chuẩn hóa thời gian, yêu cầu Google Calendar API, dựng phản hồi và thời gian tới âm thanh đầu tiên nếu có TTS. Mỗi giai đoạn cần ghi dấu thời gian đơn điệu, mã tương quan của yêu cầu và kết quả thành công/thất bại; không ghi âm thanh, token hoặc nội dung riêng tư vào log mặc định.
+Độ trễ cảm nhận của một lượt lệnh giọng nói được phân rã thành: thời gian chờ xác định kết thúc câu (do VAD), thời gian STT, thời gian hiểu lệnh và gọi dịch vụ lịch, thời gian tổng hợp câu đầu tiên. Hai chỉ số quan trọng:
+\begin{itemize}
+  \item \textbf{TTFS} (Time To First Sentence): thời gian đến khi có câu trả lời đầu tiên dạng văn bản.
+  \item \textbf{TTFA} (Time To First Audio): thời gian từ lúc người dùng dứt lời đến lúc bắt đầu nghe thấy giọng trợ lý.
+\end{itemize}
+Các kỹ thuật giảm độ trễ gồm: chạy VAD tại chỗ, tách câu trả lời để phát sớm câu đầu, đặt thời gian chờ và phương án dự phòng cho từng lời gọi dịch vụ ngoài, tái sử dụng kết nối. Khi báo cáo số đo cần nêu trung vị và phân vị 95 (p50, p95), số mẫu, cấu hình máy, điều kiện mạng và trạng thái tải mô hình; không ghi âm thanh, token hay nội dung riêng tư vào nhật ký đo.
 
-Khi đánh giá, cần báo cáo trung vị và phân vị 95 (p50, p95), số mẫu, cấu hình máy, điều kiện mạng, trạng thái mô hình (lần chạy đầu hay đã tải sẵn) và kích thước bộ dữ liệu. Mục tiêu độ trễ định lượng sẽ được chốt sau khi đo đường cơ sở trên nguyên mẫu và được giảng viên hướng dẫn thống nhất; báo cáo lần 1 không đưa ra số liệu hiệu năng giả định.
+\section{Kiến trúc ứng dụng desktop với Electron}
+Electron là nền tảng xây dựng ứng dụng desktop bằng công nghệ web \cite{electron}. Một ứng dụng gồm \textit{tiến trình chính} (main) có đầy đủ quyền của Node.js, quản lý cửa sổ và vòng đời, và các \textit{tiến trình hiển thị} (renderer) chạy giao diện web. Hướng dẫn bảo mật của Electron yêu cầu cô lập ngữ cảnh (context isolation), không cấp quyền Node.js cho renderer và chỉ công bố một tập hàm tối thiểu qua \textit{preload script} với \ma{contextBridge}; renderer gọi các hàm này bằng cơ chế IPC \cite{electronsecurity}.
 
-\section{Kiến trúc ứng dụng desktop}
-Electron là nền tảng xây dựng ứng dụng desktop bằng công nghệ web, gồm tiến trình chính quản lý vòng đời ứng dụng và các tiến trình renderer hiển thị giao diện \cite{electron}. Kiến trúc đề xuất tách giao diện, dịch vụ điều phối hội thoại, adapter âm thanh/STT/TTS và adapter Calendar API. Giao diện không được trực tiếp nắm giữ token hoặc gọi tùy ý API hệ điều hành; giao tiếp giữa renderer và tiến trình đặc quyền cần dùng các hàm IPC có danh sách cho phép.
+Để lưu thông tin nhạy cảm trên máy, Electron cung cấp \ma{safeStorage}, mã hóa dữ liệu bằng kho khóa của hệ điều hành: DPAPI trên Windows, Keychain trên macOS, và kho bí mật của môi trường desktop trên Linux; trên Linux nếu không có kho bí mật, dữ liệu thực chất không được bảo vệ \cite{electronsafestorage}. Thiết kế của đề tài tính đến trường hợp này (mục~\ref{sec:desktop-design}).
 
-Ứng dụng thường trú cần có trạng thái rõ ràng khi khởi động, chạy nền, tắt microphone, mất quyền hoặc mất kết nối. Người dùng phải nhìn thấy khi microphone đang được sử dụng, có thể tạm dừng hoặc thoát ứng dụng, và không bị ghi âm khi chưa kích hoạt theo chính sách sản phẩm.
+\section{Công nghệ phía máy chủ}
+\begin{itemize}
+  \item \textbf{Node.js và TypeScript:} dùng chung ngôn ngữ với ứng dụng desktop; kiểu tĩnh giúp mô tả chặt các hợp đồng dữ liệu giữa các mô-đun.
+  \item \textbf{Fastify:} framework HTTP theo kiến trúc plugin, kiểm tra dữ liệu vào/ra dựa trên lược đồ \cite{fastify}. Lược đồ được viết bằng \textit{zod} \cite{zod}, từ đó sinh tự động đặc tả OpenAPI 3.1 \cite{openapi}.
+  \item \textbf{PostgreSQL và Prisma:} PostgreSQL lưu người dùng, phiên, hội thoại và lịch nội bộ \cite{postgres}; Prisma cung cấp lược đồ khai báo, migration và client có kiểu \cite{prisma}.
+  \item \textbf{Docker và Docker Compose:} đóng gói dịch vụ cùng cơ sở dữ liệu để triển khai và để tạo cơ sở dữ liệu tạm cho kiểm thử \cite{docker}.
+  \item \textbf{Vitest:} khung kiểm thử cho mã TypeScript, cho phép tách dự án kiểm thử đơn vị và tích hợp \cite{vitest}.
+\end{itemize}
 
-\section{Tóm tắt cơ sở lựa chọn công nghệ}
-Các mô-đun được thiết kế qua giao diện độc lập để có thể thay đổi VAD, wake word, STT hoặc TTS mà không viết lại nghiệp vụ lịch. Quyết định công nghệ cuối cùng cần dựa trên thử nghiệm tối thiểu về độ chính xác tiếng Việt, độ trễ, bộ nhớ, giấy phép, khả năng chạy ngoại tuyến và độ dễ bảo trì. Cách tiếp cận này tránh khóa thiết kế vào một nhà cung cấp trước khi có kết quả đo.
+\section{Kết luận chương}
+Bảng~\ref{tab:tech-summary} tóm tắt lựa chọn công nghệ cho từng khâu. So với báo cáo định kỳ lần 1 (chưa chốt công nghệ), các lựa chọn trong bảng đã được hiện thực và kiểm thử; mỗi thành phần đều nằm sau một giao diện trừu tượng để có thể thay thế.
+
+\begin{table}[!htbp]
+\caption{Tóm tắt công nghệ được lựa chọn cho từng khâu}\label{tab:tech-summary}
+\bang
+\begin{tabularx}{\textwidth}{|L{2.9cm}|L{3.6cm}|L{2.4cm}|Y|}\hline
+\td{Khâu} & \td{Lựa chọn} & \td{Nơi chạy} & \td{Lý do chính}\\\hline
+VAD & Silero VAD (ONNX Runtime Web) & Ứng dụng desktop & Nhẹ, chính xác hơn phương pháp ngưỡng; âm thanh nền không rời máy.\\\hline
+Từ khóa đánh thức & Chưa hiện thực (đã khảo sát openWakeWord, Porcupine) & – & Ưu tiên hoàn thiện luồng thao tác lịch an toàn trước.\\\hline
+STT & Gemini (qua backend) & Đám mây & Không cần GPU ở máy người dùng; nhận diện được tiếng Việt và tiếng Anh.\\\hline
+Hiểu lệnh & Lai: Gemini (đầu ra JSON) + bộ luật tiếng Việt/tiếng Anh & Backend & Độ phủ của LLM, tính tất định và khả năng dự phòng của luật.\\\hline
+Suy luận ngày giờ & Ngữ pháp tự xây dựng, luxon, chrono-node & Backend & Kiểm soát được quy tắc cho tiếng Việt; kiểm thử tất định.\\\hline
+TTS & Piper (VITS, ONNX) & Backend & Chạy trên CPU, có giọng tiếng Việt, không gửi nội dung lịch ra dịch vụ ngoài.\\\hline
+Lịch & Google Calendar API v3; lịch nội bộ trong PostgreSQL & Backend & Cùng một giao diện cho hai nguồn; thử nghiệm được khi không có tài khoản Google.\\\hline
+Xác thực & OAuth 2.0 + PKCE (loopback), JWT, refresh token xoay vòng & Backend, desktop & Theo RFC 8252, RFC 7636, RFC 9700.\\\hline
+Ứng dụng desktop & Electron, React, TypeScript & Máy người dùng & Tận dụng Web Audio, WebAssembly; một mã nguồn cho nhiều hệ điều hành.\\\hline
+Backend & Node.js, Fastify, Prisma, PostgreSQL, Docker & Máy chủ & Kiểm tra dữ liệu theo lược đồ, sinh OpenAPI, dễ kiểm thử.\\\hline
+\end{tabularx}
+\nguon{Nhóm tổng hợp.}
+\end{table}
